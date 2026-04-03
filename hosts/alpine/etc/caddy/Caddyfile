@@ -1,0 +1,155 @@
+#
+# Caddyfile
+#
+# The single gate. Every request enters here.
+#
+
+
+#
+# Common
+#
+
+(common) {
+  header /media/* {
+    Cache-Control "public, max-age=315360000"
+  }
+
+  header /static/* {
+    Cache-Control "public, max-age=315360000"
+  }
+
+  header /* {
+    Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+    X-XSS-Protection "1; mode=block"
+    X-Frame-Options DENY
+    X-Content-Type-Options nosniff
+    -Server
+    -X-Powered-By
+  }
+
+  encode zstd gzip
+}
+
+
+#
+# Analytics — 8000
+#
+
+analytics.bythewood.me {
+  handle /collect/ {
+    @options {
+      method OPTIONS
+    }
+
+    respond @options 204
+
+    header Access-Control-Allow-Origin *
+    header Access-Control-Allow-Methods *
+    header Access-Control-Allow-Headers *
+    header Access-Control-Max-Age 3153600
+  }
+
+  handle /media/* {
+    uri strip_prefix /media
+    file_server {
+      root /srv/data/analytics/media
+    }
+  }
+
+  reverse_proxy localhost:8000
+
+  import common
+}
+
+
+#
+# Blog — 8100
+#
+
+blog.bythewood.me {
+  handle /media/* {
+    uri strip_prefix /media
+    file_server {
+      root /srv/data/blog/media
+    }
+  }
+
+  reverse_proxy localhost:8100
+
+  import common
+}
+
+
+#
+# Status — 8400
+#
+
+status.bythewood.me {
+  handle /media/* {
+    uri strip_prefix /media
+    file_server {
+      root /srv/data/status/media
+    }
+  }
+
+  reverse_proxy localhost:8400
+
+  import common
+}
+
+
+#
+# Timelite — 8200
+#
+
+timelite.bythewood.me {
+  reverse_proxy localhost:8200
+
+  import common
+}
+
+www.timelite.app {
+  redir https://timelite.bythewood.me
+}
+
+timelite.app {
+  redir https://timelite.bythewood.me
+}
+
+
+#
+# Dark Furrow — 8500
+#
+
+darkfurrow.com {
+  reverse_proxy localhost:8500
+
+  import common
+}
+
+www.darkfurrow.com {
+  redir https://darkfurrow.com
+}
+
+
+#
+# Isaac Bythewood — 8300
+#
+
+isaacbythewood.com {
+  reverse_proxy localhost:8300
+
+  import common
+}
+
+www.isaacbythewood.com {
+  redir https://isaacbythewood.com
+}
+
+bythewood.me {
+  redir https://isaacbythewood.com
+}
+
+www.bythewood.me {
+  redir https://isaacbythewood.com
+}
