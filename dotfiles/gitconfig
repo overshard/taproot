@@ -1,0 +1,11 @@
+[user]
+	name = Isaac Bythewood
+	email = isaac@bythewood.me
+[push]
+	default = simple
+[pull]
+	rebase = true
+[core]
+	editor = nvim
+[init]
+	defaultBranch = master
