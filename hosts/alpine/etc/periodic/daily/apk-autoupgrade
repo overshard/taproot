@@ -1,0 +1,2 @@
+#!/bin/sh
+apk upgrade --update | sed "s/^/[`date`] /" >> /var/log/apk-autoupgrade.log

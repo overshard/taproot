@@ -1,0 +1,48 @@
+#!/bin/sh
+#
+# quickstart.sh
+#
+# Alpine Linux host provisioning. I don't recommend running this script on
+# your server without modifying it to suit your needs.
+
+# Install dependencies
+apk update
+apk upgrade
+apk add \
+    neovim \
+    curl \
+    rsync \
+    git \
+    ip6tables \
+    iptables \
+    ufw \
+    borgbackup \
+    docker\
+    docker-compose \
+    caddy
+
+# Configure firewall
+ufw allow from 192.230.176.0/20 proto tcp to any port 22
+ufw allow 80/tcp
+ufw allow 80/udp  # for http3
+ufw allow 443/tcp
+ufw allow 443/udp  # for http3
+ufw --force enable
+
+# Install configuration files (expected to be pushed via scp alongside this script)
+cp etc/apk/repositories /etc/apk/repositories && chmod 644 /etc/apk/repositories
+cp etc/periodic/daily/apk-autoupgrade /etc/periodic/daily/apk-autoupgrade && chmod 700 /etc/periodic/daily/apk-autoupgrade
+cp etc/periodic/daily/borg-autobackup /etc/periodic/daily/borg-autobackup && chmod 700 /etc/periodic/daily/borg-autobackup
+cp etc/docker/daemon.json /etc/docker/daemon.json && chmod 644 /etc/docker/daemon.json
+cp root/server-health-check.sh /root/server-health-check.sh && chmod 700 /root/server-health-check.sh
+
+# Create important directories
+mkdir /srv/git && mkdir /srv/docker && mkdir /srv/data && mkdir /srv/backup
+
+# Initiate borg backups
+borg init -e none /srv/backup
+
+# Start services and add to startup
+rc-update add ufw boot && rc-service ufw start
+rc-update add docker boot && rc-service docker start
+rc-update add caddy boot && rc-service caddy start
