@@ -29,6 +29,11 @@
 # setup on my hosts to rebuild images, delete old containers, and start the new
 # containers when I make updates.
 #
+# NOTE: Fresh volumes will inherit correct dev:dev ownership from the image.
+# Existing volumes retain their permissions. If you hit root:root ownership
+# issues on existing volumes, fix with:
+#     docker exec -it bythewood-webdev sudo chown -R dev:dev /home/dev/.claude /home/dev/code
+#
 # Docker is included in this build so I can test docker stuff inside my
 # containers. Note that to get docker to function in a docker container you
 # need to use the host's docker and provide the docker.sock file from the host
@@ -126,7 +131,12 @@ COPY dotfiles/neovim/init.lua /home/dev/.config/nvim/init.lua
 RUN chown -R dev:dev /home/dev/.bash_aliases /home/dev/.gitconfig /home/dev/.config && \
     echo "source ~/.bash_aliases" >> /home/dev/.bashrc
 
+RUN mkdir -p /home/dev/code /home/dev/.claude && \
+    chown dev:dev /home/dev/code /home/dev/.claude
+
 WORKDIR /home/dev
 USER dev
+
+RUN claude install --yes
 
 CMD ["sudo", "/usr/bin/supervisord", "-c", "/etc/supervisord.conf"]
