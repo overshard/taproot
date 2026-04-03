@@ -20,6 +20,15 @@ taproot/
 ├── dotfiles/       the soil — bash, git, neovim, tmux
 ├── containers/     the vessel — development environments
 └── hosts/          the field — server provisioning and maintenance
+    └── alpine/
+        ├── quickstart.sh       provision a fresh server
+        ├── etc/caddy/          the single gate — Caddyfile
+        ├── etc/docker/         daemon configuration
+        ├── etc/periodic/       daily backups and upgrades
+        ├── root/               health checks
+        └── srv/
+            ├── projects.conf   the manifest — every project, port, repo
+            └── bootstrap.sh    clone all repos into a fresh code directory
 ```
 
 ## The container
@@ -54,12 +63,22 @@ Baked into the container at build time via COPY — no bootstrap script needed.
 
 ## The host
 
-Alpine Linux. Firewall, backups, and quiet daily maintenance. Push the files
-over and provision from here:
+Alpine Linux. Firewall, backups, and quiet daily maintenance. The Caddyfile,
+port assignments, and post-receive hooks are all generated from `projects.conf`
+so the server can be rebuilt from this repo alone.
+
+Provision a fresh server:
 
 ```sh
 scp -r hosts/alpine/ root@your-server:/root/alpine
 ssh root@your-server "cd /root/alpine && sh quickstart.sh"
+```
+
+Bootstrap a fresh code directory with all repos and server remotes:
+
+```sh
+cd ~/code
+sh taproot/hosts/alpine/srv/bootstrap.sh
 ```
 
 ## Philosophy
