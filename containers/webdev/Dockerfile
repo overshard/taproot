@@ -49,7 +49,8 @@ ENV DEBIAN_FRONTEND=noninteractive \
     TZ=UTC \
     LANG=C.UTF-8 \
     LC_ALL=C.UTF-8 \
-    TERM=xterm-256color
+    TERM=xterm-256color \
+    PATH="/home/dev/.local/bin:$PATH"
 
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
@@ -71,7 +72,6 @@ RUN apt-get update && \
         supervisor && \
     curl -fsSL https://deb.nodesource.com/setup_22.x | bash - && \
     apt-get install -y nodejs && \
-    npm install -g @anthropic-ai/claude-code && \
     curl -LsSf https://astral.sh/uv/install.sh | env UV_INSTALL_DIR=/usr/local/bin sh && \
     mkdir -p /root/.local/share/corepack/shims && \
     corepack enable && \
@@ -137,6 +137,6 @@ RUN mkdir -p /home/dev/code /home/dev/.claude && \
 WORKDIR /home/dev
 USER dev
 
-RUN claude install --yes
+RUN curl -fsSL https://claude.ai/install.sh | bash
 
 CMD ["sudo", "/usr/bin/supervisord", "-c", "/etc/supervisord.conf"]
