@@ -128,7 +128,8 @@ RUN useradd -m -G sudo,docker,postgres,redis -s /bin/bash dev && \
 COPY dotfiles/bash_aliases /home/dev/.bash_aliases
 COPY dotfiles/gitconfig /home/dev/.gitconfig
 COPY dotfiles/neovim/init.lua /home/dev/.config/nvim/init.lua
-RUN chown -R dev:dev /home/dev/.bash_aliases /home/dev/.gitconfig /home/dev/.config && \
+COPY dotfiles/tmux.conf /home/dev/.tmux.conf
+RUN chown -R dev:dev /home/dev/.bash_aliases /home/dev/.gitconfig /home/dev/.config /home/dev/.tmux.conf && \
     echo "source ~/.bash_aliases" >> /home/dev/.bashrc
 
 RUN mkdir -p /home/dev/code /home/dev/.claude && \
