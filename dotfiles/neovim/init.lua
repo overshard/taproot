@@ -1,4 +1,5 @@
 vim.opt.termguicolors = true
+vim.opt.number = true
 vim.opt.syntax = "on"
 vim.cmd.colorscheme("habamax")
 vim.api.nvim_set_hl(0, "Normal", { bg = "#000000" })
