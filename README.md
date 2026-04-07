@@ -44,14 +44,21 @@ docker build --tag overshard/webdev:latest -f containers/webdev/Dockerfile .
 
 docker volume create --name bythewood-code
 docker volume create --name bythewood-claude
+docker volume create --name bythewood-ssh
 
 docker run --detach --restart unless-stopped --name bythewood-webdev \
     --volume bythewood-code:/home/dev/code \
     --volume bythewood-claude:/home/dev/.claude \
-    --volume ~/.ssh:/home/dev/.ssh:ro \
+    --volume bythewood-ssh:/home/dev/.ssh \
     --volume /var/run/docker.sock:/var/run/docker.sock \
     -p 8000:8000 \
     overshard/webdev:latest
+
+# Copy SSH keys into the volume (first time only, PowerShell)
+docker cp $HOME/.ssh/home_key bythewood-webdev:/home/dev/.ssh/home_key
+docker cp $HOME/.ssh/home_key.pub bythewood-webdev:/home/dev/.ssh/home_key.pub
+docker exec bythewood-webdev sudo chown dev:dev /home/dev/.ssh/home_key /home/dev/.ssh/home_key.pub
+docker exec bythewood-webdev chmod 600 /home/dev/.ssh/home_key
 
 docker exec -it bythewood-webdev tmux
 ```
