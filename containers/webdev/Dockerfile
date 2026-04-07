@@ -10,24 +10,30 @@
 # Create volumes:
 #     docker volume create --name bythewood-code
 #     docker volume create --name bythewood-claude
+#     docker volume create --name bythewood-ssh
 #
 # Start container:
 #     docker run --detach --restart unless-stopped --name bythewood-webdev \
 #         --volume bythewood-code:/home/dev/code \
 #         --volume bythewood-claude:/home/dev/.claude \
-#         --volume ~/.ssh:/home/dev/.ssh:ro \
+#         --volume bythewood-ssh:/home/dev/.ssh \
 #         --volume /var/run/docker.sock:/var/run/docker.sock \
 #         -p 8000:8000 \
 #         overshard/webdev:latest
 #
+# Copy SSH keys into the volume (first time only, PowerShell):
+#     docker cp $HOME/.ssh/home_key bythewood-webdev:/home/dev/.ssh/home_key
+#     docker cp $HOME/.ssh/home_key.pub bythewood-webdev:/home/dev/.ssh/home_key.pub
+#     docker exec bythewood-webdev sudo chown dev:dev /home/dev/.ssh/home_key /home/dev/.ssh/home_key.pub
+#     docker exec bythewood-webdev chmod 600 /home/dev/.ssh/home_key
+#
 # Connect:
 #     docker exec -it bythewood-webdev tmux
 #
-# I use volumes for code and claude to make rebuilds of the container easy
-# without losing project files or claude auth and memory. The host's ~/.ssh
-# is bind mounted read-only so SSH keys are available for git. I have scripts
-# setup on my hosts to rebuild images, delete old containers, and start the new
-# containers when I make updates.
+# I use volumes for code, claude, and ssh to make rebuilds of the container
+# easy without losing project files, claude auth/memory, or SSH keys. I have
+# scripts setup on my hosts to rebuild images, delete old containers, and
+# start the new containers when I make updates.
 #
 # NOTE: Fresh volumes will inherit correct dev:dev ownership from the image.
 # Existing volumes retain their permissions. If you hit root:root ownership
@@ -132,8 +138,22 @@ COPY dotfiles/tmux.conf /home/dev/.tmux.conf
 RUN chown -R dev:dev /home/dev/.bash_aliases /home/dev/.gitconfig /home/dev/.config /home/dev/.tmux.conf && \
     echo "source ~/.bash_aliases" >> /home/dev/.bashrc
 
-RUN mkdir -p /home/dev/code /home/dev/.claude && \
-    chown dev:dev /home/dev/code /home/dev/.claude
+RUN mkdir -p /home/dev/code /home/dev/.claude /home/dev/.ssh && \
+    printf '%s\n' \
+    'Host *' \
+    '  IdentityFile ~/.ssh/home_key' \
+    '  IdentitiesOnly yes' \
+    '  StrictHostKeyChecking accept-new' \
+    '  UpdateHostKeys yes' \
+    '  HashKnownHosts yes' \
+    '  PasswordAuthentication no' \
+    '  ServerAliveInterval 60' \
+    '  ServerAliveCountMax 3' \
+    '  VisualHostKey yes' \
+    > /home/dev/.ssh/config && \
+    chmod 700 /home/dev/.ssh && \
+    chmod 600 /home/dev/.ssh/config && \
+    chown -R dev:dev /home/dev/code /home/dev/.claude /home/dev/.ssh
 
 WORKDIR /home/dev
 USER dev
