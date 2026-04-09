@@ -67,11 +67,8 @@ analytics.bythewood.me {
 #
 
 blog.bythewood.me {
-  handle /media/* {
-    uri strip_prefix /media
-    file_server {
-      root /srv/data/blog.bythewood.me/media
-    }
+  header /content/images/* {
+    Cache-Control "public, max-age=315360000"
   }
 
   reverse_proxy localhost:8100
