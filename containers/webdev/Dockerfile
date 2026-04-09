@@ -78,10 +78,11 @@ RUN apt-get update && \
         supervisor && \
     curl -fsSL https://deb.nodesource.com/setup_22.x | bash - && \
     apt-get install -y nodejs && \
-    curl -LsSf https://astral.sh/uv/install.sh | env UV_INSTALL_DIR=/usr/local/bin sh && \
+    curl -fsSL https://astral.sh/uv/install.sh | env UV_INSTALL_DIR=/usr/local/bin sh && \
     mkdir -p /root/.local/share/corepack/shims && \
     corepack enable && \
     corepack prepare yarn@stable --activate && \
+    curl -fsSL https://bun.sh/install | env BUN_INSTALL=/usr/local bash && \
     rm -rf /var/lib/apt/lists/*
 
 RUN printf '%s\n' \
