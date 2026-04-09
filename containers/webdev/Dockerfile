@@ -140,6 +140,7 @@ RUN chown -R dev:dev /home/dev/.bash_aliases /home/dev/.gitconfig /home/dev/.con
     echo "source ~/.bash_aliases" >> /home/dev/.bashrc
 
 RUN mkdir -p /home/dev/code /home/dev/.claude /home/dev/.ssh && \
+    ln -s /home/dev/.claude/.claude.json /home/dev/.claude.json && \
     printf '%s\n' \
     'Host *' \
     '  IdentityFile ~/.ssh/home_key' \
