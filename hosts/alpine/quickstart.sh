@@ -92,7 +92,7 @@ HOOK
 
     if [ "$has_migrate" = "yes" ]; then
         cat >> "/srv/git/${name}.git/hooks/post-receive" << 'MIGRATE'
-    docker compose run --rm web python3 manage.py migrate --noinput
+    docker compose exec -T web python3 manage.py migrate --noinput
 MIGRATE
     fi
 
