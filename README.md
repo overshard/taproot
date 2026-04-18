@@ -31,11 +31,25 @@ taproot/
             └── bootstrap.sh    clone all repos into a fresh code directory
 ```
 
+## The projects it tends
+
+Everything deployed lives in `hosts/alpine/srv/projects.conf`. The Caddyfile,
+port map, and post-receive hooks all grow from that single file.
+
+| Project | Port | What it is |
+|---|---|---|
+| [`analytics`](https://github.com/overshard/analytics) | 8000 | Self-hosted website analytics (Django, SQLite) |
+| [`blog.bythewood.me`](https://github.com/overshard/blog.bythewood.me) | 8100 | Personal blog (Flask, markdown files) |
+| [`timelite`](https://github.com/overshard/timelite) | 8200 | Local-only time tracker (Next.js, IndexedDB) |
+| [`isaacbythewood.com`](https://github.com/overshard/isaacbythewood.com) | 8300 | Personal portfolio (Next.js) |
+| [`status`](https://github.com/overshard/status) | 8400 | Uptime monitor & status page (Django, SQLite) |
+| [`darkfurrow.com`](https://github.com/overshard/darkfurrow.com) | 8500 | Seasonal almanac (Flask) |
+
 ## The container
 
 An Ubuntu-based development workstation with everything already in the ground:
-Python, Node, PostgreSQL, Redis, Docker, neovim, tmux, and Claude. Managed by
-supervisord. Enter through tmux.
+Python (uv), Node, Bun, PostgreSQL, Redis, Docker, neovim, tmux, and Claude.
+Managed by supervisord. Enter through tmux.
 
 Build from the repo root so the dotfiles are in the build context:
 

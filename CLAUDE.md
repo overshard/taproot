@@ -28,12 +28,28 @@ There are no tests, linters, or build steps in this repo — it is pure configur
 ## Architecture
 
 - **`dotfiles/`** — Terminal and editor config (bash, git, tmux, neovim). Neovim config is Lua-based with a custom statusline. These get COPYed into the container at build time.
-- **`containers/webdev/`** — Ubuntu 24.04 dev container running PostgreSQL 16 + Redis via supervisord. Includes Node 22 (yarn via corepack), Python 3 (pip + uv), and standard dev tools.
+- **`containers/webdev/`** — Ubuntu 24.04 dev container running PostgreSQL 16 + Redis via supervisord. Includes Node 22, Python 3 (pip + uv), Bun, Yarn (via corepack — still available for legacy repos, though all current projects use Bun), Docker-in-Docker, and standard dev tools (neovim, tmux, git, rsync, htop, nmap, etc.).
 - **`hosts/alpine/`** — Production server setup: Caddy reverse proxy (auto HTTPS), Docker Compose for services, Borg backups, UFW firewall, push-to-deploy via git hooks.
+
+## Deployed Projects
+
+`hosts/alpine/srv/projects.conf` is the single source of truth. Format per line:
+`name|port|github_repo|branch|has_data_dir|runs_migrations`. Current manifest:
+
+| Project | Port | Stack | Data dir | Migrations |
+|---|---|---|---|---|
+| `analytics` | 8000 | Django + Vite (Bun) + SQLite | yes | yes |
+| `blog.bythewood.me` | 8100 | Flask (uv) + Vite (Bun) | no | no |
+| `timelite` | 8200 | Next.js + Bun (local-only, no backend) | no | no |
+| `isaacbythewood.com` | 8300 | Next.js + Bun (Pages Router, plain JS) | no | no |
+| `status` | 8400 | Django + Vite (Bun) + SQLite | yes | yes |
+| `darkfurrow.com` | 8500 | Flask (uv) | no | no |
+
+Update ports, repos, or flags by editing `projects.conf` and re-running the relevant provisioning step — every downstream artifact (Caddyfile routes, post-receive hooks, bootstrap script) is generated from this file.
 
 ## How Deployment Works
 
-`hosts/alpine/srv/projects.conf` is the single source of truth for deployed projects. Each entry defines a project name, port, GitHub repo, and whether it needs data dirs or migrations. The bootstrap script creates bare git repos at `/srv/git/` with post-receive hooks that auto-deploy by pulling changes and running `docker compose up --build --detach`.
+`quickstart.sh` reads `projects.conf` and generates one bare repo under `/srv/git/<name>.git/` per project with a post-receive hook. Pushing to that remote triggers: `git pull`, `docker compose up --build --detach`, optional `manage.py migrate`, and a `borg` prune on hosts configured for backup. The Caddyfile proxies each project's subdomain to its bound port on `127.0.0.1`.
 
 ## Conventions
 
