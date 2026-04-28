@@ -139,8 +139,18 @@ COPY dotfiles/tmux.conf /home/dev/.tmux.conf
 RUN chown -R dev:dev /home/dev/.bash_aliases /home/dev/.gitconfig /home/dev/.config /home/dev/.tmux.conf && \
     echo "source ~/.bash_aliases" >> /home/dev/.bashrc
 
+# Two symlinks here so claude code works cleanly with our volume layout:
+#   .claude.json  -> kept inside the bythewood-claude volume so auth/state
+#                    survives container rebuilds (claude writes it to ~ by
+#                    default, but ~ isn't a volume — .claude/ is).
+#   CLAUDE.md     -> the canonical workspace guide lives in the code repo at
+#                    ~/code/CLAUDE.md. Symlinking it into ~ means claude picks
+#                    it up when launched from the home dir, not just from
+#                    inside ~/code/. Target resolves once the bythewood-code
+#                    volume mounts at runtime.
 RUN mkdir -p /home/dev/code /home/dev/.claude /home/dev/.ssh && \
     ln -s /home/dev/.claude/.claude.json /home/dev/.claude.json && \
+    ln -s code/CLAUDE.md /home/dev/CLAUDE.md && \
     printf '%s\n' \
     'Host *' \
     '  IdentityFile ~/.ssh/home_key' \
