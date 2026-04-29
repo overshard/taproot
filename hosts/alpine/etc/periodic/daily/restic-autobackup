@@ -1,0 +1,61 @@
+#!/bin/sh
+#
+# Daily backup of /srv to Backblaze B2 via restic.
+# Initializes the repo on first run. Prunes per the retention policy
+# (7 daily, 4 weekly, 6 monthly) after each successful backup.
+#
+# Credentials:
+#   /root/.restic/password   restic repo password (0600 root)
+#   /root/.restic/b2-env     exports B2_ACCOUNT_ID and B2_ACCOUNT_KEY (0600 root)
+#
+
+. /root/.restic/b2-env
+export RESTIC_REPOSITORY="b2:overshard-backups:alpine"
+export RESTIC_PASSWORD_FILE="/root/.restic/password"
+
+info() { printf "\n%s %s\n\n" "$(date)" "$*" >&2; }
+trap 'echo $(date) Backup interrupted >&2; exit 2' INT TERM
+
+if ! restic cat config >/dev/null 2>&1; then
+    info "Repository not initialized. Running restic init..."
+    restic init
+fi
+
+info "Starting backup"
+
+restic backup \
+    --verbose \
+    --exclude-caches \
+    --exclude='node_modules' \
+    --exclude='.next' \
+    --exclude='.venv' \
+    --exclude='__pycache__' \
+    --exclude='dist' \
+    --exclude='build' \
+    --exclude='.cache' \
+    --exclude='.vite' \
+    --exclude='*.pyc' \
+    /srv/git \
+    /srv/docker \
+    /srv/data
+
+backup_exit=$?
+
+info "Pruning repository"
+
+restic forget --prune \
+    --keep-daily   7 \
+    --keep-weekly  4 \
+    --keep-monthly 6
+
+prune_exit=$?
+
+global_exit=$(( backup_exit > prune_exit ? backup_exit : prune_exit ))
+
+if [ ${global_exit} -eq 0 ]; then
+    info "Backup and prune finished successfully"
+else
+    info "Backup and/or prune finished with errors (exit ${global_exit})"
+fi
+
+exit ${global_exit}

@@ -11,12 +11,14 @@
 #     docker volume create --name bythewood-code
 #     docker volume create --name bythewood-claude
 #     docker volume create --name bythewood-ssh
+#     docker volume create --name bythewood-restic
 #
 # Start container:
 #     docker run --detach --restart unless-stopped --name bythewood-webdev \
 #         --volume bythewood-code:/home/dev/code \
 #         --volume bythewood-claude:/home/dev/.claude \
 #         --volume bythewood-ssh:/home/dev/.ssh \
+#         --volume bythewood-restic:/home/dev/.restic \
 #         --volume /var/run/docker.sock:/var/run/docker.sock \
 #         -p 8000:8000 \
 #         overshard/webdev:latest
@@ -30,15 +32,28 @@
 # Connect:
 #     docker exec -it bythewood-webdev tmux
 #
-# I use volumes for code, claude, and ssh to make rebuilds of the container
-# easy without losing project files, claude auth/memory, or SSH keys. I have
-# scripts setup on my hosts to rebuild images, delete old containers, and
-# start the new containers when I make updates.
+# Restic credentials (first time only) — pull from 1Password:
+#     docker exec -i bythewood-webdev tee /home/dev/.restic/password > /dev/null  # paste, Ctrl-D
+#     docker exec -i bythewood-webdev tee /home/dev/.restic/b2-env > /dev/null    # paste, Ctrl-D
+#     docker exec bythewood-webdev chmod 600 /home/dev/.restic/password /home/dev/.restic/b2-env
+#
+# b2-env contents:
+#     export B2_ACCOUNT_ID="<keyID from 1Password>"
+#     export B2_ACCOUNT_KEY="<applicationKey from 1Password>"
+#
+# Backup and restore:
+#     docker exec -it bythewood-webdev /home/dev/backup.sh
+#     docker exec -it bythewood-webdev /home/dev/restore.sh
+#
+# I use volumes for code, claude, ssh, and restic to make rebuilds of the
+# container easy without losing project files, claude auth/memory, SSH keys,
+# or restic credentials. I have scripts setup on my hosts to rebuild images,
+# delete old containers, and start the new containers when I make updates.
 #
 # NOTE: Fresh volumes will inherit correct dev:dev ownership from the image.
 # Existing volumes retain their permissions. If you hit root:root ownership
 # issues on existing volumes, fix with:
-#     docker exec -it bythewood-webdev sudo chown -R dev:dev /home/dev/.claude /home/dev/code
+#     docker exec -it bythewood-webdev sudo chown -R dev:dev /home/dev/.claude /home/dev/code /home/dev/.restic
 #
 # Docker is included in this build so I can test docker stuff inside my
 # containers. Note that to get docker to function in a docker container you
@@ -61,7 +76,9 @@ ENV DEBIAN_FRONTEND=noninteractive \
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
         # Dev tools
-        curl git rsync neovim openssh-client tmux whois nmap \
+        curl git rsync neovim openssh-client tmux whois nmap unzip \
+        # Backups
+        restic \
         # System essentials
         tzdata ca-certificates sudo \
         # Build tools
@@ -79,9 +96,6 @@ RUN apt-get update && \
     curl -fsSL https://deb.nodesource.com/setup_22.x | bash - && \
     apt-get install -y nodejs && \
     curl -fsSL https://astral.sh/uv/install.sh | env UV_INSTALL_DIR=/usr/local/bin sh && \
-    mkdir -p /root/.local/share/corepack/shims && \
-    corepack enable && \
-    corepack prepare yarn@stable --activate && \
     curl -fsSL https://bun.sh/install | env BUN_INSTALL=/usr/local bash && \
     rm -rf /var/lib/apt/lists/*
 
@@ -148,7 +162,8 @@ RUN chown -R dev:dev /home/dev/.bash_aliases /home/dev/.gitconfig /home/dev/.con
 #                    it up when launched from the home dir, not just from
 #                    inside ~/code/. Target resolves once the bythewood-code
 #                    volume mounts at runtime.
-RUN mkdir -p /home/dev/code /home/dev/.claude /home/dev/.ssh && \
+RUN mkdir -p /home/dev/code /home/dev/.claude /home/dev/.ssh /home/dev/.restic && \
+    chmod 700 /home/dev/.restic && \
     ln -s /home/dev/.claude/.claude.json /home/dev/.claude.json && \
     ln -s code/CLAUDE.md /home/dev/CLAUDE.md && \
     printf '%s\n' \
@@ -165,7 +180,12 @@ RUN mkdir -p /home/dev/code /home/dev/.claude /home/dev/.ssh && \
     > /home/dev/.ssh/config && \
     chmod 700 /home/dev/.ssh && \
     chmod 600 /home/dev/.ssh/config && \
-    chown -R dev:dev /home/dev/code /home/dev/.claude /home/dev/.ssh
+    chown -R dev:dev /home/dev/code /home/dev/.claude /home/dev/.ssh /home/dev/.restic
+
+COPY containers/webdev/backup.sh /home/dev/backup.sh
+COPY containers/webdev/restore.sh /home/dev/restore.sh
+RUN chmod +x /home/dev/backup.sh /home/dev/restore.sh && \
+    chown dev:dev /home/dev/backup.sh /home/dev/restore.sh
 
 WORKDIR /home/dev
 USER dev

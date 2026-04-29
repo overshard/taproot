@@ -59,11 +59,13 @@ docker build --tag overshard/webdev:latest -f containers/webdev/Dockerfile .
 docker volume create --name bythewood-code
 docker volume create --name bythewood-claude
 docker volume create --name bythewood-ssh
+docker volume create --name bythewood-restic
 
 docker run --detach --restart unless-stopped --name bythewood-webdev \
     --volume bythewood-code:/home/dev/code \
     --volume bythewood-claude:/home/dev/.claude \
     --volume bythewood-ssh:/home/dev/.ssh \
+    --volume bythewood-restic:/home/dev/.restic \
     --volume /var/run/docker.sock:/var/run/docker.sock \
     -p 8000:8000 \
     overshard/webdev:latest
@@ -84,9 +86,9 @@ Baked into the container at build time via COPY — no bootstrap script needed.
 
 ## The host
 
-Alpine Linux. Firewall, backups, and quiet daily maintenance. The Caddyfile,
-port assignments, and post-receive hooks are all generated from `projects.conf`
-so the server can be rebuilt from this repo alone.
+Alpine Linux. Firewall, daily restic backups to Backblaze B2, and quiet daily
+maintenance. The Caddyfile, port assignments, and post-receive hooks are all
+generated from `projects.conf` so the server can be rebuilt from this repo alone.
 
 Provision a fresh server:
 
@@ -100,6 +102,56 @@ Bootstrap a fresh code directory with all repos and server remotes:
 ```sh
 cd ~/code
 sh taproot/hosts/alpine/srv/bootstrap.sh
+```
+
+## Backups
+
+Both the webdev container and the alpine host back up to a single Backblaze B2
+bucket (`overshard-backups`) using restic, one repo per host:
+
+| Host | Repository | Paths backed up |
+|---|---|---|
+| webdev | `b2:overshard-backups:webdev` | `~/.claude`, `~/code`, `~/.ssh` |
+| alpine | `b2:overshard-backups:alpine` | `/srv/git`, `/srv/docker`, `/srv/data` |
+
+Each host has its own application key (scoped to the bucket) and its own
+restic password — both stored in 1Password. Retention is 7 daily / 4 weekly /
+6 monthly snapshots, pruned after each backup.
+
+Place credentials before backups will run:
+
+```sh
+# webdev (paste from 1Password, then Ctrl-D)
+docker exec -i bythewood-webdev tee /home/dev/.restic/password > /dev/null
+docker exec -i bythewood-webdev tee /home/dev/.restic/b2-env > /dev/null
+docker exec bythewood-webdev chmod 600 /home/dev/.restic/password /home/dev/.restic/b2-env
+
+# alpine
+ssh root@server "cat > /root/.restic/password && chmod 600 /root/.restic/password"
+ssh root@server "cat > /root/.restic/b2-env && chmod 600 /root/.restic/b2-env"
+```
+
+`b2-env` contents (both hosts):
+
+```sh
+export B2_ACCOUNT_ID="<keyID>"
+export B2_ACCOUNT_KEY="<applicationKey>"
+```
+
+Run a backup manually:
+
+```sh
+docker exec -it bythewood-webdev /home/dev/backup.sh   # webdev (manual)
+ssh root@server /etc/periodic/daily/restic-autobackup  # alpine (also runs daily)
+```
+
+Restore the latest snapshot. Existing data is moved aside to
+`~/before-restore-<UTC-ISO>/` (webdev) or `/root/before-restore-<UTC-ISO>/srv/`
+(alpine) before restic writes the snapshot back:
+
+```sh
+docker exec -it bythewood-webdev /home/dev/restore.sh
+ssh root@server /root/restore.sh
 ```
 
 ## Philosophy

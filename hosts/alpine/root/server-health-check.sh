@@ -3,9 +3,12 @@
 echo -e "\napk upgrades ------------------------------------------------------------------"
 tail /var/log/apk-autoupgrade.log
 
-echo -e "\nborg backups ------------------------------------------------------------------"
-borg info /srv/backup/ | tail -n5 | head -n3
-borg list /srv/backup
+echo -e "\nrestic backups ----------------------------------------------------------------"
+. /root/.restic/b2-env
+export RESTIC_REPOSITORY="b2:overshard-backups:alpine"
+export RESTIC_PASSWORD_FILE="/root/.restic/password"
+restic stats latest 2>/dev/null | grep -E "Snapshot|Total File Count|Total Size"
+restic snapshots --compact 2>/dev/null | tail -n5
 
 echo -e "\nfree memory  ------------------------------------------------------------------"
 free -h | head -n2

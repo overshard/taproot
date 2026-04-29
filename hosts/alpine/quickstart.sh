@@ -22,7 +22,7 @@ apk add \
     ip6tables \
     iptables \
     ufw \
-    borgbackup \
+    restic \
     docker \
     docker-compose \
     caddy
@@ -38,16 +38,21 @@ ufw --force enable
 # Install configuration files
 cp etc/apk/repositories /etc/apk/repositories && chmod 644 /etc/apk/repositories
 cp etc/periodic/daily/apk-autoupgrade /etc/periodic/daily/apk-autoupgrade && chmod 700 /etc/periodic/daily/apk-autoupgrade
-cp etc/periodic/daily/borg-autobackup /etc/periodic/daily/borg-autobackup && chmod 700 /etc/periodic/daily/borg-autobackup
+cp etc/periodic/daily/restic-autobackup /etc/periodic/daily/restic-autobackup && chmod 700 /etc/periodic/daily/restic-autobackup
 cp etc/docker/daemon.json /etc/docker/daemon.json && chmod 644 /etc/docker/daemon.json
 cp etc/caddy/Caddyfile /etc/caddy/Caddyfile && chmod 644 /etc/caddy/Caddyfile
 cp root/server-health-check.sh /root/server-health-check.sh && chmod 700 /root/server-health-check.sh
+cp root/restore.sh /root/restore.sh && chmod 700 /root/restore.sh
 
 # Create directory structure
-mkdir -p /srv/git /srv/docker /srv/data /srv/backup
+mkdir -p /srv/git /srv/docker /srv/data
+mkdir -p /root/.restic && chmod 700 /root/.restic
 
-# Initialize borg backup repository
-borg init -e none /srv/backup
+echo ""
+echo "** Place restic credentials before backups will run: **"
+echo "   /root/.restic/password   restic repo password (chmod 600)"
+echo "   /root/.restic/b2-env     exports B2_ACCOUNT_ID and B2_ACCOUNT_KEY (chmod 600)"
+echo ""
 
 # Provision each project from projects.conf
 while IFS='|' read -r name port repo branch has_data has_migrate; do
