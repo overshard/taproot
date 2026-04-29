@@ -28,8 +28,8 @@ There are no tests, linters, or build steps in this repo — it is pure configur
 ## Architecture
 
 - **`dotfiles/`** — Terminal and editor config (bash, git, tmux, neovim). Neovim config is Lua-based with a custom statusline. These get COPYed into the container at build time.
-- **`containers/webdev/`** — Ubuntu 24.04 dev container running PostgreSQL 16 + Redis via supervisord. Includes Node 22, Python 3 (pip + uv), Bun, Yarn (via corepack — still available for legacy repos, though all current projects use Bun), Docker-in-Docker, and standard dev tools (neovim, tmux, git, rsync, htop, nmap, etc.).
-- **`hosts/alpine/`** — Production server setup: Caddy reverse proxy (auto HTTPS), Docker Compose for services, Borg backups, UFW firewall, push-to-deploy via git hooks.
+- **`containers/webdev/`** — Ubuntu 24.04 dev container running PostgreSQL 16 + Redis via supervisord. Includes Node 22, Python 3 (pip + uv), Bun, Docker-in-Docker, and standard dev tools (neovim, tmux, git, rsync, htop, nmap, unzip, etc.).
+- **`hosts/alpine/`** — Production server setup: Caddy reverse proxy (auto HTTPS), Docker Compose for services, restic backups to Backblaze B2, UFW firewall, push-to-deploy via git hooks.
 
 ## Deployed Projects
 
@@ -49,7 +49,7 @@ Update ports, repos, or flags by editing `projects.conf` and re-running the rele
 
 ## How Deployment Works
 
-`quickstart.sh` reads `projects.conf` and generates one bare repo under `/srv/git/<name>.git/` per project with a post-receive hook. Pushing to that remote triggers: `git pull`, `docker compose up --build --detach`, optional `manage.py migrate`, and a `borg` prune on hosts configured for backup. The Caddyfile proxies each project's subdomain to its bound port on `127.0.0.1`.
+`quickstart.sh` reads `projects.conf` and generates one bare repo under `/srv/git/<name>.git/` per project with a post-receive hook. Pushing to that remote triggers: `git pull`, `docker compose up --build --detach`, optional `manage.py migrate`, and `docker system prune`. The Caddyfile proxies each project's subdomain to its bound port on `127.0.0.1`.
 
 ## Conventions
 
