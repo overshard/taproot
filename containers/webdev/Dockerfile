@@ -84,6 +84,8 @@ RUN apt-get update && \
         build-essential tzdata ca-certificates \
         # Python
         python3 python3-pip python3-venv \
+        # WeasyPrint (PDF rendering for blog.bythewood.me)
+        libpango-1.0-0 libpangoft2-1.0-0 libharfbuzz0b libharfbuzz-subset0 \
         # Docker
         docker.io docker-compose-v2 && \
     curl -fsSL https://deb.nodesource.com/setup_22.x | bash - && \
