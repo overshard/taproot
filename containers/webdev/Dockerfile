@@ -13,8 +13,9 @@
 #     docker volume create --name bythewood-ssh
 #     docker volume create --name bythewood-restic
 #
-# Start container:
-#     docker run --detach --restart unless-stopped --name bythewood-webdev \
+# Start container (--init gives us a proper PID 1 that reaps zombies — without
+# it, exiting tmux leaves [tmux: server] <defunct> entries hanging around):
+#     docker run --detach --init --restart unless-stopped --name bythewood-webdev \
 #         --volume bythewood-code:/home/dev/code \
 #         --volume bythewood-claude:/home/dev/.claude \
 #         --volume bythewood-ssh:/home/dev/.ssh \
@@ -76,74 +77,27 @@ ENV DEBIAN_FRONTEND=noninteractive \
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
         # Dev tools
-        curl git rsync neovim openssh-client tmux whois nmap unzip \
+        curl git rsync neovim openssh-client tmux whois nmap unzip htop tree sudo \
         # Backups
         restic \
-        # System essentials
-        tzdata ca-certificates sudo \
         # Build tools
-        build-essential \
-        # Monitoring
-        htop \
+        build-essential tzdata ca-certificates \
         # Python
         python3 python3-pip python3-venv \
-        # Database and caching
-        postgresql redis-server \
         # Docker
-        docker.io docker-compose-v2 \
-        # Process management
-        supervisor && \
+        docker.io docker-compose-v2 && \
     curl -fsSL https://deb.nodesource.com/setup_22.x | bash - && \
     apt-get install -y nodejs && \
     curl -fsSL https://astral.sh/uv/install.sh | env UV_INSTALL_DIR=/usr/local/bin sh && \
-    curl -fsSL https://bun.sh/install | env BUN_INSTALL=/usr/local bash && \
-    rm -rf /var/lib/apt/lists/*
+    curl -fsSL https://bun.sh/install | env BUN_INSTALL=/usr/local bash
 
-RUN printf '%s\n' \
-    'bind 127.0.0.1' \
-    'protected-mode yes' \
-    'port 6379' \
-    'supervised no' \
-    'daemonize no' \
-    'logfile ""' \
-    'dir /var/lib/redis' \
-    'save ""' \
-    > /etc/redis/redis.conf && \
-    mkdir -p /var/lib/redis && \
-    chown redis:redis /var/lib/redis
+ENV PLAYWRIGHT_BROWSERS_PATH=/opt/playwright-browsers
+RUN npx --yes playwright@latest install --with-deps chromium && \
+    chmod -R a+rx /opt/playwright-browsers
 
 RUN ln -snf /usr/share/zoneinfo/UTC /etc/localtime && echo "UTC" > /etc/timezone
 
-RUN service postgresql start && \
-    sudo -u postgres createuser -s dev && \
-    service postgresql stop
-
-RUN printf '%s\n' \
-    '[supervisord]' \
-    'pidfile=/run/supervisord.pid' \
-    'user=root' \
-    'nodaemon=true' \
-    'logfile=/dev/null' \
-    'logfile_maxbytes=0' \
-    '' \
-    '[program:postgresql]' \
-    'command=/usr/lib/postgresql/16/bin/postgres -D /var/lib/postgresql/16/main -c config_file=/etc/postgresql/16/main/postgresql.conf' \
-    'autostart=true' \
-    'user=postgres' \
-    'stdout_logfile=/dev/fd/1' \
-    'stdout_logfile_maxbytes=0' \
-    'redirect_stderr=true' \
-    '' \
-    '[program:redis]' \
-    'command=/usr/bin/redis-server /etc/redis/redis.conf' \
-    'autostart=true' \
-    'user=redis' \
-    'stdout_logfile=/dev/fd/1' \
-    'stdout_logfile_maxbytes=0' \
-    'redirect_stderr=true' \
-    > /etc/supervisord.conf
-
-RUN useradd -m -G sudo,docker,postgres,redis -s /bin/bash dev && \
+RUN useradd -m -G sudo,docker -s /bin/bash dev && \
     echo "dev ALL=(ALL) NOPASSWD: ALL" > /etc/sudoers.d/dev
 
 COPY dotfiles/bash_aliases /home/dev/.bash_aliases
@@ -192,4 +146,4 @@ USER dev
 
 RUN curl -fsSL https://claude.ai/install.sh | bash
 
-CMD ["sudo", "/usr/bin/supervisord", "-c", "/etc/supervisord.conf"]
+CMD ["sleep", "infinity"]

@@ -48,8 +48,9 @@ port map, and post-receive hooks all grow from that single file.
 ## The container
 
 An Ubuntu-based development workstation with everything already in the ground:
-Python (uv), Node, Bun, PostgreSQL, Redis, Docker, neovim, tmux, and Claude.
-Managed by supervisord. Enter through tmux.
+Python (uv), Node, Bun, Docker, neovim, tmux, Claude, and Playwright Chromium
+(for the Claude playwright MCP). Kept alive with `sleep infinity`; enter
+through `docker exec -it bythewood-webdev tmux`.
 
 Build from the repo root so the dotfiles are in the build context:
 
@@ -61,7 +62,7 @@ docker volume create --name bythewood-claude
 docker volume create --name bythewood-ssh
 docker volume create --name bythewood-restic
 
-docker run --detach --restart unless-stopped --name bythewood-webdev \
+docker run --detach --init --restart unless-stopped --name bythewood-webdev \
     --volume bythewood-code:/home/dev/code \
     --volume bythewood-claude:/home/dev/.claude \
     --volume bythewood-ssh:/home/dev/.ssh \
