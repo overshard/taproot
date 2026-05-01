@@ -28,7 +28,7 @@ There are no tests, linters, or build steps in this repo — it is pure configur
 ## Architecture
 
 - **`dotfiles/`** — Terminal and editor config (bash, git, tmux, neovim). Neovim config is Lua-based with a custom statusline. These get COPYed into the container at build time.
-- **`containers/webdev/`** — Ubuntu 24.04 dev container running PostgreSQL 16 + Redis via supervisord. Includes Node 22, Python 3 (pip + uv), Bun, Docker-in-Docker, and standard dev tools (neovim, tmux, git, rsync, htop, nmap, unzip, etc.).
+- **`containers/webdev/`** — Ubuntu 24.04 dev container with Node 22, Python 3 (pip + uv), Bun, Docker-in-Docker, Playwright Chromium (under `/opt/playwright-browsers`, for the Claude playwright MCP), and standard dev tools (neovim, tmux, git, rsync, htop, nmap, unzip, etc.). Stays alive via `sleep infinity`; entered through `docker exec -it ... tmux`. Started with `docker run --init` so PID 1 reaps zombies left behind when tmux exits.
 - **`hosts/alpine/`** — Production server setup: Caddy reverse proxy (auto HTTPS), Docker Compose for services, restic backups to Backblaze B2, UFW firewall, push-to-deploy via git hooks.
 
 ## Deployed Projects
