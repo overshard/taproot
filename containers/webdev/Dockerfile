@@ -14,14 +14,15 @@
 #     docker volume create --name bythewood-restic
 #
 # Start container (--init gives us a proper PID 1 that reaps zombies — without
-# it, exiting tmux leaves [tmux: server] <defunct> entries hanging around):
+# it, exiting tmux leaves [tmux: server] <defunct> entries hanging around. Port
+# 2222 on the host maps to sshd inside the container for editor remote-dev):
 #     docker run --detach --init --restart unless-stopped --name bythewood-webdev \
 #         --volume bythewood-code:/home/dev/code \
 #         --volume bythewood-claude:/home/dev/.claude \
 #         --volume bythewood-ssh:/home/dev/.ssh \
 #         --volume bythewood-restic:/home/dev/.restic \
 #         --volume /var/run/docker.sock:/var/run/docker.sock \
-#         -p 8000:8000 \
+#         -p 8000:8000 -p 2222:22 \
 #         overshard/webdev:latest
 #
 # Copy SSH keys into the volume (first time only, PowerShell):
@@ -30,8 +31,26 @@
 #     docker exec bythewood-webdev sudo chown dev:dev /home/dev/.ssh/home_key /home/dev/.ssh/home_key.pub
 #     docker exec bythewood-webdev chmod 600 /home/dev/.ssh/home_key
 #
-# Connect:
+# The entrypoint symlinks home_key.pub -> authorized_keys on first start, so
+# the same key authenticates both outbound (from the container) and inbound
+# (from your host into the container). To pull the public key back out:
+#     docker cp bythewood-webdev:/home/dev/.ssh/home_key.pub - | tar -xO
+#
+# Connect (TUI workflow):
 #     docker exec -it bythewood-webdev tmux
+#
+# Connect (SSH for editor remote-dev — Zed, VS Code, JetBrains Gateway):
+#     1. Add this entry to your host machine's ~/.ssh/config:
+#            Host bythewood-webdev
+#                HostName localhost
+#                Port 2222
+#                User dev
+#                IdentityFile ~/.ssh/home_key
+#                StrictHostKeyChecking accept-new
+#     2. ssh bythewood-webdev   (or use bythewood-webdev as the remote in Zed)
+#
+# Host keys persist in /home/dev/.ssh/host_keys/ inside the bythewood-ssh
+# volume, so SSH fingerprints survive image rebuilds.
 #
 # Restic credentials (first time only) — pull from 1Password:
 #     docker exec -i bythewood-webdev tee /home/dev/.restic/password > /dev/null  # paste, Ctrl-D
@@ -77,7 +96,7 @@ ENV DEBIAN_FRONTEND=noninteractive \
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
         # Dev tools
-        curl git rsync neovim openssh-client tmux whois nmap unzip htop tree sudo \
+        curl git rsync neovim openssh-client openssh-server tmux whois nmap unzip htop tree sudo \
         # Backups
         restic \
         # Build tools
@@ -143,9 +162,27 @@ COPY containers/webdev/restore.sh /home/dev/restore.sh
 RUN chmod +x /home/dev/backup.sh /home/dev/restore.sh && \
     chown dev:dev /home/dev/backup.sh /home/dev/restore.sh
 
+# sshd setup. Host keys are NOT generated here — the entrypoint creates them
+# in the .ssh volume on first start so fingerprints survive image rebuilds.
+# pam_loginuid is downgraded to optional because containers don't have
+# CAP_AUDIT_WRITE by default and the default `required` makes logins fail.
+RUN mkdir -p /run/sshd && \
+    sed -i 's/session\s*required\s*pam_loginuid\.so/session optional pam_loginuid.so/g' /etc/pam.d/sshd && \
+    printf '%s\n' \
+        'PermitRootLogin no' \
+        'PasswordAuthentication no' \
+        'PubkeyAuthentication yes' \
+        'AllowUsers dev' \
+        'HostKey /home/dev/.ssh/host_keys/ssh_host_ed25519_key' \
+        > /etc/ssh/sshd_config.d/webdev.conf
+
+COPY containers/webdev/entrypoint.sh /usr/local/bin/entrypoint.sh
+RUN chmod +x /usr/local/bin/entrypoint.sh
+
 WORKDIR /home/dev
 USER dev
 
 RUN curl -fsSL https://claude.ai/install.sh | bash
 
+ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
 CMD ["sleep", "infinity"]
