@@ -6,7 +6,10 @@ set -e
 
 HOST_KEY_DIR=/home/dev/.ssh/host_keys
 
-if [ ! -f "$HOST_KEY_DIR/ssh_host_ed25519_key" ]; then
+# Check via sudo because $HOST_KEY_DIR is mode 700 root:root and dev can't
+# traverse it — without sudo the test always reads as "missing" and we'd
+# re-enter ssh-keygen on every start, which prompts to overwrite and crashes.
+if ! sudo test -f "$HOST_KEY_DIR/ssh_host_ed25519_key"; then
     sudo mkdir -p "$HOST_KEY_DIR"
     sudo ssh-keygen -t ed25519 -f "$HOST_KEY_DIR/ssh_host_ed25519_key" -N "" -q
     sudo chmod 700 "$HOST_KEY_DIR"
