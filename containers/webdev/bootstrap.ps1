@@ -144,6 +144,10 @@ function Invoke-Helper-Clone {
     # from the webdev container's perspective. Tell git not to refuse on
     # ownership mismatch, and chown back to 1000:1000 at the end so the dev
     # user inside webdev can read/write the result.
+    #
+    # The host SSH key gets mounted read-only at /keys/home_key with mode 0777
+    # (Windows NTFS has no unix mode to copy), which sshd refuses. So we copy
+    # it to /tmp/home_key and chmod 600 there before any git operation.
     $cmd = if ($Action -eq "clone") {
         "git -c safe.directory='*' clone --branch '$TaprootBranch' '$TaprootRepo' /code/taproot"
     } else {
@@ -153,9 +157,9 @@ function Invoke-Helper-Clone {
     docker run --rm `
         --volume "${HostKeyPath}:/keys/home_key:ro" `
         --volume "bythewood-code:/code" `
-        -e GIT_SSH_COMMAND="ssh -i /keys/home_key -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new -o UserKnownHostsFile=/tmp/known_hosts" `
+        -e GIT_SSH_COMMAND="ssh -i /tmp/home_key -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new -o UserKnownHostsFile=/tmp/known_hosts" `
         $HelperImage `
-        sh -c "set -e; apt-get update >/dev/null && apt-get install -y --no-install-recommends git openssh-client >/dev/null && $cmd && chown -R 1000:1000 /code/taproot"
+        sh -c "set -e; apt-get update >/dev/null && apt-get install -y --no-install-recommends git openssh-client >/dev/null && cp /keys/home_key /tmp/home_key && chmod 600 /tmp/home_key && $cmd && chown -R 1000:1000 /code/taproot"
 
     if ($LASTEXITCODE -ne 0) { Fail "helper container failed during '$Action'" }
 }
