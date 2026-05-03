@@ -140,26 +140,38 @@ function Step-Volumes {
 function Invoke-Helper-Clone {
     param([string]$Action) # "clone" or "pull"
 
-    # Helper runs as root but the bythewood-code volume is dev-owned (UID 1000)
-    # from the webdev container's perspective. Tell git not to refuse on
-    # ownership mismatch, and chown back to 1000:1000 at the end so the dev
-    # user inside webdev can read/write the result.
+    # Run git as UID 1000 (the ubuntu user that ships in ubuntu:24.04, which
+    # by coincidence matches webdev's dev user) so files in the volume are
+    # created with the right owner from the start. No after-the-fact chown
+    # required, which has been unreliable in practice.
     #
-    # The host SSH key gets mounted read-only at /keys/home_key with mode 0777
-    # (Windows NTFS has no unix mode to copy), which sshd refuses. So we copy
-    # it to /tmp/home_key and chmod 600 there before any git operation.
-    $cmd = if ($Action -eq "clone") {
-        "git -c safe.directory='*' clone --branch '$TaprootBranch' '$TaprootRepo' /code/taproot"
+    # The host SSH key is bind-mounted read-only at /keys/home_key. Windows
+    # NTFS has no unix mode to copy, so it lands at 0777 which sshd refuses.
+    # We copy it into ubuntu's $HOME and chmod 600 before invoking git.
+    $gitOp = if ($Action -eq "clone") {
+        "git clone --branch $TaprootBranch $TaprootRepo /code/taproot"
     } else {
-        "cd /code/taproot && git -c safe.directory='*' fetch --all --prune && git -c safe.directory='*' pull --ff-only"
+        "cd /code/taproot && git fetch --all --prune && git pull --ff-only"
     }
+
+    $script = @"
+set -e
+apt-get update >/dev/null
+apt-get install -y --no-install-recommends git openssh-client sudo >/dev/null
+id -u ubuntu >/dev/null 2>&1 || useradd -u 1000 -m -d /home/ubuntu -s /bin/sh ubuntu
+mkdir -p /home/ubuntu/.ssh
+cp /keys/home_key /home/ubuntu/.ssh/home_key
+chmod 700 /home/ubuntu/.ssh
+chmod 600 /home/ubuntu/.ssh/home_key
+chown -R 1000:1000 /home/ubuntu /code
+sudo -u ubuntu -E env GIT_SSH_COMMAND='ssh -i /home/ubuntu/.ssh/home_key -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new -o UserKnownHostsFile=/tmp/known_hosts' sh -c '$gitOp'
+"@
 
     docker run --rm `
         --volume "${HostKeyPath}:/keys/home_key:ro" `
         --volume "bythewood-code:/code" `
-        -e GIT_SSH_COMMAND="ssh -i /tmp/home_key -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new -o UserKnownHostsFile=/tmp/known_hosts" `
         $HelperImage `
-        sh -c "set -e; apt-get update >/dev/null && apt-get install -y --no-install-recommends git openssh-client >/dev/null && cp /keys/home_key /tmp/home_key && chmod 600 /tmp/home_key && $cmd && chown -R 1000:1000 /code/taproot"
+        sh -c $script
 
     if ($LASTEXITCODE -ne 0) { Fail "helper container failed during '$Action'" }
 }
