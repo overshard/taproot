@@ -1,0 +1,18 @@
+# SSH config (host)
+#
+# Place at: ~\.ssh\config on Windows (i.e. C:\Users\<you>\.ssh\config)
+#
+# Pairs with the bythewood-webdev container: SSH into the dev environment for
+# editor remote-dev (Zed, VS Code, JetBrains Gateway). The container's sshd
+# listens on host port 2222 (mapped from container port 22).
+
+Host *
+    IdentityFile ~/.ssh/home_key
+    StrictHostKeyChecking accept-new
+
+Host bythewood-webdev
+    HostName localhost
+    Port 2222
+    User dev
+    IdentityFile ~/.ssh/home_key
+    StrictHostKeyChecking accept-new

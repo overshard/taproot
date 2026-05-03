@@ -8,11 +8,21 @@
 # Stops docker before moving /srv (running containers bind-mount /srv/docker/*)
 # and starts it again after restore completes.
 #
-# After restore, you'll need to bring projects up manually, e.g.:
-#     for d in /srv/docker/*; do (cd "$d" && docker compose up --build -d); done
+# Usage:
+#   restore.sh           Restore data only; bring up containers manually
+#   restore.sh --up      Restore data, then bring up every project via
+#                        `docker compose up --build -d`
 #
 
 set -eu
+
+UP=0
+for arg in "$@"; do
+    case "$arg" in
+        --up) UP=1 ;;
+        *) echo "Unknown argument: $arg" >&2; exit 1 ;;
+    esac
+done
 
 . /root/.restic/b2-env
 export RESTIC_REPOSITORY="b2:overshard-backups:alpine"
@@ -36,12 +46,25 @@ restic restore latest --target /
 echo "Starting docker..."
 rc-service docker start
 
+if [ "$UP" -eq 1 ]; then
+    echo ""
+    echo "Bringing up containers..."
+    for d in /srv/docker/*; do
+        if [ -d "$d" ] && [ -f "$d/docker-compose.yml" ]; then
+            echo "  -> $(basename "$d")"
+            (cd "$d" && docker compose up --build -d)
+        fi
+    done
+fi
+
 echo ""
 echo "Restore complete. Previous /srv archived at:"
 echo "  $ARCHIVE/srv"
 echo ""
-echo "Bring projects up with:"
-echo "  for d in /srv/docker/*; do (cd \"\$d\" && docker compose up --build -d); done"
-echo ""
+if [ "$UP" -eq 0 ]; then
+    echo "Bring projects up with:"
+    echo "  for d in /srv/docker/*; do (cd \"\$d\" && docker compose up --build -d); done"
+    echo ""
+fi
 echo "Once you've verified everything looks right, you can remove the archive:"
 echo "  rm -rf $ARCHIVE"

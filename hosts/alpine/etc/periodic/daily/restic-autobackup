@@ -4,9 +4,12 @@
 # Initializes the repo on first run. Prunes per the retention policy
 # (7 daily, 4 weekly, 6 monthly) after each successful backup.
 #
+# Snapshots are tagged with --host=$RESTIC_HOST for parity with the
+# webdev backups. Set RESTIC_HOST in /root/.restic/b2-env (e.g. "alpine").
+#
 # Credentials:
 #   /root/.restic/password   restic repo password (0600 root)
-#   /root/.restic/b2-env     exports B2_ACCOUNT_ID and B2_ACCOUNT_KEY (0600 root)
+#   /root/.restic/b2-env     exports B2_ACCOUNT_ID, B2_ACCOUNT_KEY, RESTIC_HOST (0600 root)
 #
 
 . /root/.restic/b2-env
@@ -15,6 +18,11 @@ export RESTIC_PASSWORD_FILE="/root/.restic/password"
 
 info() { printf "\n%s %s\n\n" "$(date)" "$*" >&2; }
 trap 'echo $(date) Backup interrupted >&2; exit 2' INT TERM
+
+if [ -z "${RESTIC_HOST:-}" ]; then
+    info "ERROR: RESTIC_HOST is not set. Add 'export RESTIC_HOST=alpine' to /root/.restic/b2-env"
+    exit 1
+fi
 
 if ! restic cat config >/dev/null 2>&1; then
     info "Repository not initialized. Running restic init..."
@@ -25,6 +33,7 @@ info "Starting backup"
 
 restic backup \
     --verbose \
+    --host="$RESTIC_HOST" \
     --exclude-caches \
     --exclude='node_modules' \
     --exclude='.next' \
@@ -44,6 +53,7 @@ backup_exit=$?
 info "Pruning repository"
 
 restic forget --prune \
+    --host="$RESTIC_HOST" \
     --keep-daily   7 \
     --keep-weekly  4 \
     --keep-monthly 6

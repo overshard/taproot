@@ -1,87 +1,38 @@
 # webdev
 #
-# Used for working on most of my website development projects, using a rolling
-# distro to have the latest packages to work with. Uses tmux, neovim, and
-# claude code for a full TUI workflow.
+# Ubuntu 24.04 dev container with tmux, neovim, claude code, Bun, uv, Docker
+# CLI, and Playwright Chromium. Used as a portable development environment
+# across desktop and laptop, with restic backups to Backblaze B2.
 #
-# NOTE: Build from the taproot repo root so dotfiles are in the build context:
+# Setup is automated by bootstrap.ps1 (idempotent, run from PowerShell on the
+# host). It creates volumes, builds this image, runs the container, copies
+# the host SSH key in, and prompts for restic creds:
+#
+#     cd <path-to-taproot>
+#     .\containers\webdev\bootstrap.ps1 desktop      # or "laptop"
+#     .\containers\webdev\bootstrap.ps1 laptop -Restore   # also pulls B2 snapshot
+#
+# Connect (TUI):    docker exec -it bythewood-webdev tmux
+# Connect (SSH):    ssh -p 2222 dev@localhost
+#
+# Helper scripts inside the container (in PATH at /home/dev/scripts/):
+#     backup     manual restic backup to B2
+#     restore    pull latest snapshot from B2
+#     sync       git fetch + ff-only pull every repo under ~/code/
+#     status     last snapshot per host across both restic repos
+#
+# The bythewood-* volumes survive image rebuilds, so /home/dev/code,
+# /home/dev/.claude, /home/dev/.ssh, and /home/dev/.restic persist. Fresh
+# volumes inherit dev:dev ownership from the image. If existing volumes ever
+# hit root:root issues:
+#     docker exec -it bythewood-webdev sudo chown -R dev:dev \
+#         /home/dev/.claude /home/dev/code /home/dev/.restic
+#
+# Manual build (bootstrap.ps1 does this for you):
 #     docker build --tag overshard/webdev:latest -f containers/webdev/Dockerfile .
 #
-# Create volumes:
-#     docker volume create --name bythewood-code
-#     docker volume create --name bythewood-claude
-#     docker volume create --name bythewood-ssh
-#     docker volume create --name bythewood-restic
-#
-# Start container (--init gives us a proper PID 1 that reaps zombies — without
-# it, exiting tmux leaves [tmux: server] <defunct> entries hanging around. Port
-# 2222 on the host maps to sshd inside the container for editor remote-dev):
-#     docker run --detach --init --restart unless-stopped --name bythewood-webdev \
-#         --volume bythewood-code:/home/dev/code \
-#         --volume bythewood-claude:/home/dev/.claude \
-#         --volume bythewood-ssh:/home/dev/.ssh \
-#         --volume bythewood-restic:/home/dev/.restic \
-#         --volume /var/run/docker.sock:/var/run/docker.sock \
-#         -p 8000:8000 -p 2222:22 \
-#         overshard/webdev:latest
-#
-# Copy SSH keys into the volume (first time only, PowerShell):
-#     docker cp $HOME/.ssh/home_key bythewood-webdev:/home/dev/.ssh/home_key
-#     docker cp $HOME/.ssh/home_key.pub bythewood-webdev:/home/dev/.ssh/home_key.pub
-#     docker exec bythewood-webdev sudo chown dev:dev /home/dev/.ssh/home_key /home/dev/.ssh/home_key.pub
-#     docker exec bythewood-webdev chmod 600 /home/dev/.ssh/home_key
-#
-# The entrypoint symlinks home_key.pub -> authorized_keys on first start, so
-# the same key authenticates both outbound (from the container) and inbound
-# (from your host into the container). To pull the public key back out:
-#     docker cp bythewood-webdev:/home/dev/.ssh/home_key.pub - | tar -xO
-#
-# Connect (TUI workflow):
-#     docker exec -it bythewood-webdev tmux
-#
-# Connect (SSH for editor remote-dev — Zed, VS Code, JetBrains Gateway):
-#     1. Add this entry to your host machine's ~/.ssh/config:
-#            Host bythewood-webdev
-#                HostName localhost
-#                Port 2222
-#                User dev
-#                IdentityFile ~/.ssh/home_key
-#                StrictHostKeyChecking accept-new
-#     2. ssh bythewood-webdev   (or use bythewood-webdev as the remote in Zed)
-#
-# Host keys persist in /home/dev/.ssh/host_keys/ inside the bythewood-ssh
-# volume, so SSH fingerprints survive image rebuilds.
-#
-# Restic credentials (first time only) — pull from 1Password:
-#     docker exec -i bythewood-webdev tee /home/dev/.restic/password > /dev/null  # paste, Ctrl-D
-#     docker exec -i bythewood-webdev tee /home/dev/.restic/b2-env > /dev/null    # paste, Ctrl-D
-#     docker exec bythewood-webdev chmod 600 /home/dev/.restic/password /home/dev/.restic/b2-env
-#
-# b2-env contents:
-#     export B2_ACCOUNT_ID="<keyID from 1Password>"
-#     export B2_ACCOUNT_KEY="<applicationKey from 1Password>"
-#
-# Backup and restore:
-#     docker exec -it bythewood-webdev /home/dev/backup.sh
-#     docker exec -it bythewood-webdev /home/dev/restore.sh
-#
-# I use volumes for code, claude, ssh, and restic to make rebuilds of the
-# container easy without losing project files, claude auth/memory, SSH keys,
-# or restic credentials. I have scripts setup on my hosts to rebuild images,
-# delete old containers, and start the new containers when I make updates.
-#
-# NOTE: Fresh volumes will inherit correct dev:dev ownership from the image.
-# Existing volumes retain their permissions. If you hit root:root ownership
-# issues on existing volumes, fix with:
-#     docker exec -it bythewood-webdev sudo chown -R dev:dev /home/dev/.claude /home/dev/code /home/dev/.restic
-#
-# Docker is included in this build so I can test docker stuff inside my
-# containers. Note that to get docker to function in a docker container you
-# need to use the host's docker and provide the docker.sock file from the host
-# to the container. This can be done with `--volume /var/run/docker.sock:/var/run/docker.sock`.
-#
-# The naming is so that I can make a container and volumes for each of my
-# clients and keep a separation of work.
+# The docker CLI is installed and /var/run/docker.sock is mounted in so I can
+# poke at the host's daemon from inside the container when I need to.
 
 
 FROM ubuntu:24.04
@@ -157,10 +108,12 @@ RUN mkdir -p /home/dev/code /home/dev/.claude /home/dev/.ssh /home/dev/.restic &
     chmod 600 /home/dev/.ssh/config && \
     chown -R dev:dev /home/dev/code /home/dev/.claude /home/dev/.ssh /home/dev/.restic
 
-COPY containers/webdev/backup.sh /home/dev/backup.sh
-COPY containers/webdev/restore.sh /home/dev/restore.sh
-RUN chmod +x /home/dev/backup.sh /home/dev/restore.sh && \
-    chown dev:dev /home/dev/backup.sh /home/dev/restore.sh
+COPY containers/webdev/backup.sh /home/dev/scripts/backup
+COPY containers/webdev/restore.sh /home/dev/scripts/restore
+COPY containers/webdev/sync.sh /home/dev/scripts/sync
+COPY containers/webdev/status.sh /home/dev/scripts/status
+RUN chmod +x /home/dev/scripts/* && \
+    chown -R dev:dev /home/dev/scripts
 
 # sshd setup. Host keys are NOT generated here — the entrypoint creates them
 # in the .ssh volume on first start so fingerprints survive image rebuilds.
