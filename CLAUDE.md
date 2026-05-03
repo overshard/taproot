@@ -10,9 +10,12 @@ Taproot is a personal infrastructure repository containing dotfiles, a Docker de
 
 **Set up the dev container on a Windows host (idempotent, safe to re-run):**
 ```powershell
-.\containers\webdev\bootstrap.ps1 desktop      # or "laptop"
-.\containers\webdev\bootstrap.ps1 laptop -Restore   # also pulls B2 snapshot
+irm https://raw.githubusercontent.com/overshard/taproot/master/containers/webdev/bootstrap.ps1 -OutFile bootstrap.ps1
+powershell -ExecutionPolicy Bypass -File .\bootstrap.ps1 laptop      # or "desktop"
+powershell -ExecutionPolicy Bypass -File .\bootstrap.ps1 laptop -Restore   # also pulls B2 snapshot
 ```
+
+The `-ExecutionPolicy Bypass` flag scopes to that one invocation; nothing on your system changes persistently.
 
 **Build the dev container manually (bootstrap.ps1 does this for you):**
 ```sh

@@ -5,12 +5,14 @@
 # across desktop and laptop, with restic backups to Backblaze B2.
 #
 # Setup is automated by bootstrap.ps1 (idempotent, run from PowerShell on the
-# host). It creates volumes, builds this image, runs the container, copies
-# the host SSH key in, and prompts for restic creds:
+# host). It creates volumes, clones taproot into bythewood-code via a helper
+# container, builds this image, runs the container, copies the host SSH key
+# in, and prompts for restic creds. Taproot itself does not need to be on
+# the host; everything operates against the bythewood-code volume.
 #
-#     cd <path-to-taproot>
-#     .\containers\webdev\bootstrap.ps1 desktop      # or "laptop"
-#     .\containers\webdev\bootstrap.ps1 laptop -Restore   # also pulls B2 snapshot
+#     irm https://raw.githubusercontent.com/overshard/taproot/master/containers/webdev/bootstrap.ps1 -OutFile bootstrap.ps1
+#     powershell -ExecutionPolicy Bypass -File .\bootstrap.ps1 laptop      # or "desktop"
+#     powershell -ExecutionPolicy Bypass -File .\bootstrap.ps1 laptop -Restore   # also pulls B2 snapshot
 #
 # Connect (TUI):    docker exec -it bythewood-webdev tmux
 # Connect (SSH):    ssh -p 2222 dev@localhost
