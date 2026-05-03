@@ -249,16 +249,22 @@ function Step-Ssh {
     $keyOk = ($LASTEXITCODE -eq 0)
     docker exec $ContainerName test -f /home/dev/.ssh/home_key.pub 2>$null
     $pubOk = ($LASTEXITCODE -eq 0)
+
     if ($keyOk -and $pubOk) {
         Skip "home_key already in volume"
-        return
+    } else {
+        docker cp $HostKeyPath "${ContainerName}:/home/dev/.ssh/home_key" | Out-Null
+        docker cp $HostKeyPubPath "${ContainerName}:/home/dev/.ssh/home_key.pub" | Out-Null
+        Done "copied home_key + home_key.pub into bythewood-ssh volume"
     }
 
-    docker cp $HostKeyPath "${ContainerName}:/home/dev/.ssh/home_key" | Out-Null
-    docker cp $HostKeyPubPath "${ContainerName}:/home/dev/.ssh/home_key.pub" | Out-Null
+    # Always (re)apply ownership and perms. docker cp from Windows hosts loses
+    # mode info, and pre-existing keys from earlier manual setups may have been
+    # left at 0777, which sshd refuses ("unprotected private key file").
     docker exec $ContainerName sudo chown dev:dev /home/dev/.ssh/home_key /home/dev/.ssh/home_key.pub | Out-Null
-    docker exec $ContainerName chmod 600 /home/dev/.ssh/home_key | Out-Null
-    Done "copied home_key + home_key.pub into bythewood-ssh volume"
+    docker exec $ContainerName sudo chmod 600 /home/dev/.ssh/home_key | Out-Null
+    docker exec $ContainerName sudo chmod 644 /home/dev/.ssh/home_key.pub | Out-Null
+    Done "verified perms (key 600, pub 644)"
 }
 
 # ---------------------------------------------------------------------------
