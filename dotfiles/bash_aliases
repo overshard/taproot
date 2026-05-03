@@ -1,1 +1,5 @@
+# Helper scripts (backup, restore, sync, status) live in ~/scripts and are
+# invokable as bare commands from anywhere.
+export PATH="$HOME/scripts:$PATH"
+
 alias ls='LC_COLLATE=C ls --color=auto -h --group-directories-first'
