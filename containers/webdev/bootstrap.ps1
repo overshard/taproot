@@ -140,14 +140,14 @@ function Step-Volumes {
 function Invoke-Helper-Clone {
     param([string]$Action) # "clone" or "pull"
 
-    # Run git as UID 1000 (the ubuntu user that ships in ubuntu:24.04, which
-    # by coincidence matches webdev's dev user) so files in the volume are
-    # created with the right owner from the start. No after-the-fact chown
-    # required, which has been unreliable in practice.
+    # Run git as UID 1001 to match webdev's `dev` user. Why 1001: ubuntu:24.04
+    # ships with a default `ubuntu` user at UID 1000, so when webdev's
+    # Dockerfile does `useradd dev` it gets UID 1001 (next available). Files
+    # created here as 1001 match dev inside webdev with no chown gymnastics.
     #
     # The host SSH key is bind-mounted read-only at /keys/home_key. Windows
     # NTFS has no unix mode to copy, so it lands at 0777 which sshd refuses.
-    # We copy it into ubuntu's $HOME and chmod 600 before invoking git.
+    # We copy it into the helper user's $HOME and chmod 600 before invoking git.
     $gitOp = if ($Action -eq "clone") {
         "git clone --branch $TaprootBranch $TaprootRepo /code/taproot"
     } else {
@@ -158,13 +158,13 @@ function Invoke-Helper-Clone {
 set -e
 apt-get update >/dev/null
 apt-get install -y --no-install-recommends git openssh-client sudo >/dev/null
-id -u ubuntu >/dev/null 2>&1 || useradd -u 1000 -m -d /home/ubuntu -s /bin/sh ubuntu
-mkdir -p /home/ubuntu/.ssh
-cp /keys/home_key /home/ubuntu/.ssh/home_key
-chmod 700 /home/ubuntu/.ssh
-chmod 600 /home/ubuntu/.ssh/home_key
-chown -R 1000:1000 /home/ubuntu /code
-sudo -u ubuntu -E env GIT_SSH_COMMAND='ssh -i /home/ubuntu/.ssh/home_key -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new -o UserKnownHostsFile=/tmp/known_hosts' sh -c '$gitOp'
+id -u devhelper >/dev/null 2>&1 || useradd -u 1001 -m -d /home/devhelper -s /bin/sh devhelper
+mkdir -p /home/devhelper/.ssh
+cp /keys/home_key /home/devhelper/.ssh/home_key
+chmod 700 /home/devhelper/.ssh
+chmod 600 /home/devhelper/.ssh/home_key
+chown -R 1001:1001 /home/devhelper /code
+sudo -u devhelper -E env GIT_SSH_COMMAND='ssh -i /home/devhelper/.ssh/home_key -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new -o UserKnownHostsFile=/tmp/known_hosts' sh -c '$gitOp'
 "@
 
     docker run --rm `
