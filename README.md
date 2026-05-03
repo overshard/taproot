@@ -17,18 +17,25 @@ changes and stays quiet when nothing needs to.
 
 ```
 taproot/
-├── dotfiles/       the soil — bash, git, neovim, tmux
-├── containers/     the vessel — development environments
-└── hosts/          the field — server provisioning and maintenance
+├── dotfiles/                       the soil — bash, git, neovim, tmux
+│   └── host/                       host-side configs (Zed, Windows ssh-config)
+├── containers/
+│   └── webdev/
+│       ├── Dockerfile              the vessel — Ubuntu 24.04 dev image
+│       ├── bootstrap.ps1           one-shot host setup (Windows)
+│       ├── backup.sh, restore.sh   restic to / from B2
+│       ├── sync.sh                 git pull every repo under ~/code/
+│       └── status.sh               last snapshot per host across repos
+└── hosts/
     └── alpine/
-        ├── quickstart.sh       provision a fresh server
-        ├── etc/caddy/          the single gate — Caddyfile
-        ├── etc/docker/         daemon configuration
-        ├── etc/periodic/       daily backups and upgrades
-        ├── root/               health checks
+        ├── quickstart.sh           provision a fresh server
+        ├── etc/caddy/              the single gate — Caddyfile
+        ├── etc/docker/             daemon configuration
+        ├── etc/periodic/           daily backups and upgrades
+        ├── root/                   health checks, restore.sh
         └── srv/
-            ├── projects.conf   the manifest — every project, port, repo
-            └── bootstrap.sh    clone all repos into a fresh code directory
+            ├── projects.conf       the manifest — every project, port, repo
+            └── bootstrap.sh        clone all repos into a fresh code directory
 ```
 
 ## The projects it tends
@@ -47,43 +54,61 @@ port map, and post-receive hooks all grow from that single file.
 
 ## The container
 
-An Ubuntu-based development workstation with everything already in the ground:
-Python (uv), Node, Bun, Docker, neovim, tmux, Claude, and Playwright Chromium
-(for the Claude playwright MCP). Kept alive with `sleep infinity`; enter
-through `docker exec -it bythewood-webdev tmux`.
+An Ubuntu 24.04 development workstation with everything already in the ground:
+Python (uv), Node, Bun, Docker CLI, neovim, tmux, Claude, and Playwright
+Chromium (for the Claude playwright MCP). Kept alive with `sleep infinity`.
 
-Build from the repo root so the dotfiles are in the build context:
+### Bootstrap on a fresh Windows host
+
+Prereqs: Docker Desktop installed and running, an SSH key at
+`$HOME\.ssh\home_key` (and `.pub`) added to GitHub. Nothing else.
+
+```powershell
+irm https://raw.githubusercontent.com/overshard/taproot/master/containers/webdev/bootstrap.ps1 -OutFile bootstrap.ps1
+powershell -ExecutionPolicy Bypass -File .\bootstrap.ps1 laptop
+```
+
+`-ExecutionPolicy Bypass` is needed because PowerShell blocks scripts pulled
+from the internet by default; the flag scopes to that one invocation, no
+persistent system change. Use `desktop` or `laptop` as the first arg to tag
+this machine's restic snapshots. Re-run any time; every step is idempotent.
+
+Bootstrap creates the four `bythewood-*` volumes, clones taproot into
+`bythewood-code` via a throwaway helper container (so the host filesystem stays
+clean), builds the image using `docker.sock` and the volume-resident taproot,
+runs the container, copies your host SSH key into the volume, and prompts for
+restic credentials. Pass `-Force` to pull the latest taproot, rebuild the
+image, and recreate the container; pass `-Restore` to also pull data from B2.
+
+Then connect:
 
 ```sh
-docker build --tag overshard/webdev:latest -f containers/webdev/Dockerfile .
-
-docker volume create --name bythewood-code
-docker volume create --name bythewood-claude
-docker volume create --name bythewood-ssh
-docker volume create --name bythewood-restic
-
-docker run --detach --init --restart unless-stopped --name bythewood-webdev \
-    --volume bythewood-code:/home/dev/code \
-    --volume bythewood-claude:/home/dev/.claude \
-    --volume bythewood-ssh:/home/dev/.ssh \
-    --volume bythewood-restic:/home/dev/.restic \
-    --volume /var/run/docker.sock:/var/run/docker.sock \
-    -p 8000:8000 \
-    overshard/webdev:latest
-
-# Copy SSH keys into the volume (first time only, PowerShell)
-docker cp $HOME/.ssh/home_key bythewood-webdev:/home/dev/.ssh/home_key
-docker cp $HOME/.ssh/home_key.pub bythewood-webdev:/home/dev/.ssh/home_key.pub
-docker exec bythewood-webdev sudo chown dev:dev /home/dev/.ssh/home_key /home/dev/.ssh/home_key.pub
-docker exec bythewood-webdev chmod 600 /home/dev/.ssh/home_key
-
-docker exec -it bythewood-webdev tmux
+docker exec -it bythewood-webdev tmux       # TUI workflow
+ssh -p 2222 dev@localhost                   # editor remote-dev (Zed, VS Code, JetBrains)
 ```
+
+### Helper scripts inside the container
+
+All in `~/scripts/` and on `PATH`:
+
+| Command | What it does |
+|---|---|
+| `backup`  | Manual restic backup to B2; snapshot tagged with `$RESTIC_HOST` |
+| `restore` | Pull latest snapshot from B2; existing data archived first |
+| `sync`    | `git fetch && git pull --ff-only` for every repo under `~/code/` |
+| `status`  | Last snapshot per host across both restic repos, plus repo size |
 
 ## The dotfiles
 
 Minimal by intention. I respect defaults and only override what earns it.
-Baked into the container at build time via COPY — no bootstrap script needed.
+Two flavors:
+
+- **`dotfiles/`** baked into the container at build time via COPY (bash, git,
+  tmux, neovim).
+- **`dotfiles/host/`** copied by hand on a fresh Windows machine. Bootstrap
+  doesn't manage these to avoid trampling other entries you have:
+  - `dotfiles/host/zed-settings.json` -> `%APPDATA%\Zed\settings.json`
+  - `dotfiles/host/ssh-config` -> `~\.ssh\config` (merge with existing entries)
 
 ## The host
 
@@ -108,51 +133,53 @@ sh taproot/hosts/alpine/srv/bootstrap.sh
 ## Backups
 
 Both the webdev container and the alpine host back up to a single Backblaze B2
-bucket (`overshard-backups`) using restic, one repo per host:
+bucket (`overshard-backups`) using restic, one repo per kind:
 
-| Host | Repository | Paths backed up |
-|---|---|---|
-| webdev | `b2:overshard-backups:webdev` | `~/.claude`, `~/code`, `~/.ssh` |
-| alpine | `b2:overshard-backups:alpine` | `/srv/git`, `/srv/docker`, `/srv/data` |
+| Repository | What's in it |
+|---|---|
+| `b2:overshard-backups:webdev` | Per-machine snapshots from desktop and laptop (`~/.claude`, `~/code`, `~/.ssh`). Each snapshot tagged with `$RESTIC_HOST` (`desktop` or `laptop`); retention applies per-machine. |
+| `b2:overshard-backups:alpine` | Daily snapshots from the production server (`/srv/git`, `/srv/docker`, `/srv/data`). |
 
-Each host has its own application key (scoped to the bucket) and its own
-restic password — both stored in 1Password. Retention is 7 daily / 4 weekly /
-6 monthly snapshots, pruned after each backup.
+Retention: 7 daily, 4 weekly, 6 monthly per host, pruned after each backup.
+Restic passwords and B2 application keys live in 1Password.
 
-Place credentials before backups will run:
+### Webdev credentials
 
-```sh
-# webdev (paste from 1Password, then Ctrl-D)
-docker exec -i bythewood-webdev tee /home/dev/.restic/password > /dev/null
-docker exec -i bythewood-webdev tee /home/dev/.restic/b2-env > /dev/null
-docker exec bythewood-webdev chmod 600 /home/dev/.restic/password /home/dev/.restic/b2-env
-
-# alpine
-ssh root@server "cat > /root/.restic/password && chmod 600 /root/.restic/password"
-ssh root@server "cat > /root/.restic/b2-env && chmod 600 /root/.restic/b2-env"
-```
-
-`b2-env` contents (both hosts):
+Placed automatically by `bootstrap.ps1` (it prompts for them and writes into
+the `bythewood-restic` volume). The `b2-env` file ends up looking like:
 
 ```sh
 export B2_ACCOUNT_ID="<keyID>"
 export B2_ACCOUNT_KEY="<applicationKey>"
+export RESTIC_HOST="desktop"   # or "laptop"
 ```
 
-Run a backup manually:
+Optional: drop the alpine repo password at `~/.restic/alpine-password`
+(prompted for during bootstrap) so `status` can report on the alpine repo too.
+
+### Alpine credentials
+
+Placed by hand after `quickstart.sh` runs (the same paste-from-1Password
+pattern), at `/root/.restic/password` and `/root/.restic/b2-env`. The alpine
+`b2-env` should also have `RESTIC_HOST="alpine"`.
+
+### Daily flow
 
 ```sh
-docker exec -it bythewood-webdev /home/dev/backup.sh   # webdev (manual)
-ssh root@server /etc/periodic/daily/restic-autobackup  # alpine (also runs daily)
+backup     # take a snapshot from this machine
+status     # check fleet health (both repos, every host) from anywhere
+sync       # pull every repo under ~/code/ to GitHub HEAD
 ```
 
-Restore the latest snapshot. Existing data is moved aside to
-`~/before-restore-<UTC-ISO>/` (webdev) or `/root/before-restore-<UTC-ISO>/srv/`
-(alpine) before restic writes the snapshot back:
+### Restore
+
+Existing data is moved aside to `~/before-restore-<UTC-ISO>/` (webdev) or
+`/root/before-restore-<UTC-ISO>/srv/` (alpine) before restic writes the
+snapshot back:
 
 ```sh
-docker exec -it bythewood-webdev /home/dev/restore.sh
-ssh root@server /root/restore.sh
+restore                                 # webdev (from inside the container)
+ssh root@server /root/restore.sh --up   # alpine; --up auto-restarts containers
 ```
 
 ## Philosophy
