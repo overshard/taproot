@@ -18,11 +18,15 @@
     Each step inspects current state and skips if already done, so this is
     safe to re-run on a partially-configured machine.
 
-    First-time machine setup (one-liner; assumes Docker Desktop is running and
-    you have an SSH key at $HOME/.ssh/home_key added to GitHub):
+    First-time machine setup (assumes Docker Desktop is running and you have
+    an SSH key at $HOME/.ssh/home_key added to GitHub):
 
         irm https://raw.githubusercontent.com/overshard/taproot/master/containers/webdev/bootstrap.ps1 -OutFile bootstrap.ps1
-        .\bootstrap.ps1 laptop
+        powershell -ExecutionPolicy Bypass -File .\bootstrap.ps1 laptop
+
+    The Bypass flag is needed because PowerShell's default execution policy
+    blocks scripts downloaded from the internet. It only applies to this one
+    invocation; nothing on your system changes.
 
     Host-side dotfiles (Zed settings, ~/.ssh/config) are NOT managed by this
     script. After taproot is in the bythewood-code volume, copy them by hand:
@@ -136,10 +140,14 @@ function Step-Volumes {
 function Invoke-Helper-Clone {
     param([string]$Action) # "clone" or "pull"
 
+    # Helper runs as root but the bythewood-code volume is dev-owned (UID 1000)
+    # from the webdev container's perspective. Tell git not to refuse on
+    # ownership mismatch, and chown back to 1000:1000 at the end so the dev
+    # user inside webdev can read/write the result.
     $cmd = if ($Action -eq "clone") {
-        "git clone --branch '$TaprootBranch' '$TaprootRepo' /code/taproot"
+        "git -c safe.directory='*' clone --branch '$TaprootBranch' '$TaprootRepo' /code/taproot"
     } else {
-        "cd /code/taproot && git fetch --all --prune && git pull --ff-only"
+        "cd /code/taproot && git -c safe.directory='*' fetch --all --prune && git -c safe.directory='*' pull --ff-only"
     }
 
     docker run --rm `
@@ -147,7 +155,7 @@ function Invoke-Helper-Clone {
         --volume "bythewood-code:/code" `
         -e GIT_SSH_COMMAND="ssh -i /keys/home_key -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new -o UserKnownHostsFile=/tmp/known_hosts" `
         $HelperImage `
-        sh -c "set -e; apt-get update >/dev/null && apt-get install -y --no-install-recommends git openssh-client >/dev/null && $cmd"
+        sh -c "set -e; apt-get update >/dev/null && apt-get install -y --no-install-recommends git openssh-client >/dev/null && $cmd && chown -R 1000:1000 /code/taproot"
 
     if ($LASTEXITCODE -ne 0) { Fail "helper container failed during '$Action'" }
 }
