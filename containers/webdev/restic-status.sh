@@ -1,6 +1,6 @@
 #!/bin/sh
 #
-# status.sh
+# restic-status.sh
 #
 # Show backup health for both restic repos (webdev and alpine) from a single
 # command. Both repos live in the same Backblaze B2 account, so the B2 creds

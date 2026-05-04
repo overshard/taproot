@@ -1,10 +1,18 @@
 #!/bin/sh
 #
-# sync.sh
+# code-sync.sh
 #
-# Pull latest from origin for every git repo under ~/code/. Skips repos with
-# uncommitted changes. Uses --ff-only so divergent branches never get a silent
-# merge or rebase; they just warn and move on.
+# Two-pass sync for the ~/code/ workspace.
+#
+# 1) Pull latest from origin for every git repo already under ~/code/. Skips
+#    repos with uncommitted changes or detached HEAD. Uses --ff-only so a
+#    divergent branch never gets a silent merge or rebase.
+#
+# 2) Hit the public GitHub API for $GITHUB_USER (overshard) and clone any
+#    non-archived, non-fork, owned repos that don't exist locally yet, using
+#    the SSH key configured globally in ~/.ssh/config (no auth needed for the
+#    API call; this is one request per run, well under the 60/hr unauth
+#    rate limit).
 #
 # Run after switching machines (e.g. desktop -> laptop) to catch up.
 #
@@ -12,6 +20,8 @@
 set -u
 
 CODE="$HOME/code"
+GITHUB_USER="overshard"
+
 if [ ! -d "$CODE" ]; then
     echo "ERROR: $CODE does not exist" >&2
     exit 1
@@ -20,6 +30,9 @@ fi
 ok=0
 warn=0
 skip=0
+new=0
+
+echo "Pulling existing repos..."
 
 for path in "$CODE"/*/; do
     [ -d "$path/.git" ] || continue
@@ -63,5 +76,42 @@ for path in "$CODE"/*/; do
     fi
 done
 
+cd "$CODE"
+
 echo ""
-printf "%d updated, %d warned, %d skipped\n" "$ok" "$warn" "$skip"
+echo "Discovering repos for $GITHUB_USER..."
+
+api="https://api.github.com/users/$GITHUB_USER/repos?per_page=100&type=owner"
+json=$(curl -fsSL -H 'Accept: application/vnd.github+json' "$api" 2>/dev/null || true)
+
+if [ -z "$json" ]; then
+    printf "  [warn] GitHub API request failed\n"
+    warn=$((warn + 1))
+else
+    count=$(printf '%s' "$json" | jq 'length' 2>/dev/null || echo 0)
+    if [ "$count" -eq 100 ]; then
+        printf "  [warn] received exactly 100 repos; pagination may be needed\n"
+        warn=$((warn + 1))
+    fi
+
+    list=$(mktemp)
+    printf '%s' "$json" \
+        | jq -r '.[] | select(.archived == false and .fork == false) | "\(.name) \(.ssh_url)"' \
+        > "$list"
+
+    while IFS=' ' read -r repo url; do
+        [ -z "$repo" ] && continue
+        [ -d "$CODE/$repo" ] && continue
+        printf "  [new]  cloning %s\n" "$repo"
+        if git clone --quiet "$url" "$CODE/$repo" 2>/dev/null; then
+            new=$((new + 1))
+        else
+            printf "  [warn] clone failed for %s\n" "$repo"
+            warn=$((warn + 1))
+        fi
+    done < "$list"
+    rm -f "$list"
+fi
+
+echo ""
+printf "%d updated, %d cloned, %d warned, %d skipped\n" "$ok" "$new" "$warn" "$skip"
