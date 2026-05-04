@@ -23,9 +23,11 @@ taproot/
 │   └── webdev/
 │       ├── Dockerfile              the vessel — Ubuntu 24.04 dev image
 │       ├── bootstrap.ps1           one-shot host setup (Windows)
-│       ├── backup.sh, restore.sh   restic to / from B2
-│       ├── sync.sh                 git pull every repo under ~/code/
-│       └── status.sh               last snapshot per host across repos
+│       ├── restic-backup.sh        manual restic snapshot to B2
+│       ├── restic-restore.sh       pull latest snapshot from B2
+│       ├── restic-status.sh        last snapshot per host across repos
+│       ├── code-sync.sh            pull existing repos + clone new ones from GitHub
+│       └── server-health-check.sh  ssh into alpine and run its health check
 └── hosts/
     └── alpine/
         ├── quickstart.sh           provision a fresh server
@@ -93,10 +95,11 @@ All in `~/scripts/` and on `PATH`:
 
 | Command | What it does |
 |---|---|
-| `backup`  | Manual restic backup to B2; snapshot tagged with `$RESTIC_HOST` |
-| `restore` | Pull latest snapshot from B2; existing data archived first |
-| `sync`    | `git fetch && git pull --ff-only` for every repo under `~/code/` |
-| `status`  | Last snapshot per host across both restic repos, plus repo size |
+| `restic-backup`        | Manual restic backup to B2; snapshot tagged with `$RESTIC_HOST` |
+| `restic-restore`       | Pull latest snapshot from B2; existing data archived first |
+| `restic-status`        | Last snapshot per host across both restic repos, plus repo size |
+| `code-sync`            | `git fetch && git pull --ff-only` for every repo under `~/code/`, then clones any non-archived non-fork repos owned by overshard on GitHub that aren't local yet |
+| `server-health-check`  | SSH into alpine and run its `/root/server-health-check.sh`. Override target with `$ALPINE_HOST` |
 
 ## The dotfiles
 
@@ -155,7 +158,7 @@ export RESTIC_HOST="desktop"   # or "laptop"
 ```
 
 Optional: drop the alpine repo password at `~/.restic/alpine-password`
-(prompted for during bootstrap) so `status` can report on the alpine repo too.
+(prompted for during bootstrap) so `restic-status` can report on the alpine repo too.
 
 ### Alpine credentials
 
@@ -166,9 +169,9 @@ pattern), at `/root/.restic/password` and `/root/.restic/b2-env`. The alpine
 ### Daily flow
 
 ```sh
-backup     # take a snapshot from this machine
-status     # check fleet health (both repos, every host) from anywhere
-sync       # pull every repo under ~/code/ to GitHub HEAD
+restic-backup   # take a snapshot from this machine
+restic-status   # check fleet health (both repos, every host) from anywhere
+code-sync       # pull every repo under ~/code/ + clone any new ones from GitHub
 ```
 
 ### Restore
@@ -178,7 +181,7 @@ Existing data is moved aside to `~/before-restore-<UTC-ISO>/` (webdev) or
 snapshot back:
 
 ```sh
-restore                                 # webdev (from inside the container)
+restic-restore                          # webdev (from inside the container)
 ssh root@server /root/restore.sh --up   # alpine; --up auto-restarts containers
 ```
 

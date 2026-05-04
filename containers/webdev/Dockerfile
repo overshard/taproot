@@ -18,10 +18,13 @@
 # Connect (SSH):    ssh -p 2222 dev@localhost
 #
 # Helper scripts inside the container (in PATH at /home/dev/scripts/):
-#     backup     manual restic backup to B2
-#     restore    pull latest snapshot from B2
-#     sync       git fetch + ff-only pull every repo under ~/code/
-#     status     last snapshot per host across both restic repos
+#     restic-backup        manual restic backup to B2
+#     restic-restore       pull latest snapshot from B2
+#     restic-status        last snapshot per host across both restic repos
+#     code-sync            ff-only pull every ~/code/ repo, then clone any
+#                          new non-archived owned repos from GitHub
+#     server-health-check  ssh into alpine and run the server-side health
+#                          script (apk, restic, free, df, docker stats)
 #
 # The bythewood-* volumes survive image rebuilds, so /home/dev/code,
 # /home/dev/.claude, /home/dev/.ssh, and /home/dev/.restic persist. Fresh
@@ -49,7 +52,7 @@ ENV DEBIAN_FRONTEND=noninteractive \
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
         # Dev tools
-        curl git rsync neovim openssh-client openssh-server tmux whois nmap unzip htop tree sudo \
+        curl git rsync neovim openssh-client openssh-server tmux whois nmap unzip htop tree sudo jq \
         # Backups
         restic \
         # Build tools
@@ -110,10 +113,11 @@ RUN mkdir -p /home/dev/code /home/dev/.claude /home/dev/.ssh /home/dev/.restic &
     chmod 600 /home/dev/.ssh/config && \
     chown -R dev:dev /home/dev/code /home/dev/.claude /home/dev/.ssh /home/dev/.restic
 
-COPY containers/webdev/backup.sh /home/dev/scripts/backup
-COPY containers/webdev/restore.sh /home/dev/scripts/restore
-COPY containers/webdev/sync.sh /home/dev/scripts/sync
-COPY containers/webdev/status.sh /home/dev/scripts/status
+COPY containers/webdev/restic-backup.sh /home/dev/scripts/restic-backup
+COPY containers/webdev/restic-restore.sh /home/dev/scripts/restic-restore
+COPY containers/webdev/restic-status.sh /home/dev/scripts/restic-status
+COPY containers/webdev/code-sync.sh /home/dev/scripts/code-sync
+COPY containers/webdev/server-health-check.sh /home/dev/scripts/server-health-check
 RUN chmod +x /home/dev/scripts/* && \
     chown -R dev:dev /home/dev/scripts
 

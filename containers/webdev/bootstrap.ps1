@@ -48,8 +48,8 @@
     container, ssh, restic-password, b2-env, alpine-password, restore.
 
 .PARAMETER Restore
-    After all setup steps, run ~/scripts/restore inside the container to pull
-    data from the latest B2 snapshot. Opt-in.
+    After all setup steps, run ~/scripts/restic-restore inside the container
+    to pull data from the latest B2 snapshot. Opt-in.
 
 .PARAMETER Force
     Pull latest taproot, rebuild the image, remove the existing container,
@@ -360,7 +360,7 @@ function Step-AlpinePassword {
         Skip "/home/dev/.restic/alpine-password already set"
         return
     }
-    Write-Host "  Optional: lets ~/scripts/status query the alpine repo too." -ForegroundColor DarkGray
+    Write-Host "  Optional: lets ~/scripts/restic-status query the alpine repo too." -ForegroundColor DarkGray
     $pw = Read-Secret "Alpine repo password (or empty to skip)"
     if (-not $pw) {
         Skip "no value provided"
@@ -377,8 +377,8 @@ function Step-Restore {
         Skip "use -Restore to pull data from B2"
         return
     }
-    Done "running ~/scripts/restore inside container"
-    docker exec -it $ContainerName /home/dev/scripts/restore
+    Done "running ~/scripts/restic-restore inside container"
+    docker exec -it $ContainerName /home/dev/scripts/restic-restore
 }
 
 # ---------------------------------------------------------------------------
