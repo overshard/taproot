@@ -1,6 +1,6 @@
 #!/bin/sh
 #
-# restore.sh
+# restic-restore.sh
 #
 # Restore this container from the latest snapshot in Backblaze B2.
 # Existing contents of ~/.claude, ~/code, and ~/.ssh are moved aside to

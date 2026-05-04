@@ -1,6 +1,6 @@
 #!/bin/sh
 #
-# backup.sh
+# restic-backup.sh
 #
 # Run manually to back up this container to Backblaze B2 via restic.
 # Initializes the repo on first run. Prunes per the retention policy
