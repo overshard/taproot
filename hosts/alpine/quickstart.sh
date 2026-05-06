@@ -103,7 +103,8 @@ MIGRATE
     fi
 
     cat >> "/srv/git/${name}.git/hooks/post-receive" << TAIL
-    docker system prune --force
+    docker container prune --force
+    docker image prune --force
     END_TIME=\$(date +%s)
     echo "Total build time: \$((END_TIME - START_TIME))s"
   fi
