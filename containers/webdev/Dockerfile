@@ -63,8 +63,8 @@ RUN apt-get update && \
         rustc cargo \
         # WeasyPrint (PDF rendering for blog.bythewood.me)
         libpango-1.0-0 libpangoft2-1.0-0 libharfbuzz0b libharfbuzz-subset0 \
-        # Docker
-        docker.io docker-compose-v2 && \
+        # Docker (buildx enables BuildKit cache mounts in Dockerfiles)
+        docker.io docker-compose-v2 docker-buildx && \
     curl -fsSL https://deb.nodesource.com/setup_22.x | bash - && \
     apt-get install -y nodejs && \
     curl -fsSL https://astral.sh/uv/install.sh | env UV_INSTALL_DIR=/usr/local/bin sh && \

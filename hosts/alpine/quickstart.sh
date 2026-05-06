@@ -24,6 +24,7 @@ apk add \
     ufw \
     restic \
     docker \
+    docker-cli-buildx \
     docker-compose \
     caddy
 
