@@ -50,7 +50,7 @@ There are no tests, linters, or build steps in this repo — it is pure configur
 - **`dotfiles/host/`** — Host-side configs that don't belong in the container: Zed editor settings and Windows SSH config. These are NOT placed automatically by bootstrap.ps1; copy them manually on a fresh machine:
   - `dotfiles/host/zed-settings.json` -> `%APPDATA%\Zed\settings.json`
   - `dotfiles/host/ssh-config` -> `~\.ssh\config` (merge into existing entries if you have other Hosts already configured)
-- **`containers/webdev/`** — Ubuntu 24.04 dev container with Node 22, Python 3 (pip + uv), Bun, Docker CLI, Playwright Chromium (under `/opt/playwright-browsers`, for the Claude playwright MCP), and standard dev tools (neovim, tmux, git, rsync, htop, nmap, unzip, etc.). Stays alive via `sleep infinity`; entered through `docker exec -it ... tmux` for the TUI workflow or over SSH on host port 2222 for editor remote-dev. `entrypoint.sh` starts sshd before exec'ing CMD; host keys persist in the `bythewood-ssh` volume so fingerprints survive rebuilds. Started with `docker run --init` so PID 1 reaps zombies left behind when tmux/sshd children exit. Helper scripts (`restic-backup`, `restic-restore`, `restic-status`, `code-sync`, `server-health-check`) are baked in at `/home/dev/scripts/` and on PATH. Host setup is automated by `bootstrap.ps1`.
+- **`containers/webdev/`** — Ubuntu 24.04 dev container with Node 22, Python 3 (pip + uv), Bun, Rust (rustc + cargo from apt, for the axum projects), Docker CLI, Playwright Chromium (under `/opt/playwright-browsers`, for the Claude playwright MCP), and standard dev tools (neovim, tmux, git, rsync, htop, nmap, unzip, etc.). Stays alive via `sleep infinity`; entered through `docker exec -it ... tmux` for the TUI workflow or over SSH on host port 2222 for editor remote-dev. `entrypoint.sh` starts sshd before exec'ing CMD; host keys persist in the `bythewood-ssh` volume so fingerprints survive rebuilds. Started with `docker run --init` so PID 1 reaps zombies left behind when tmux/sshd children exit. Helper scripts (`restic-backup`, `restic-restore`, `restic-status`, `code-sync`, `server-health-check`) are baked in at `/home/dev/scripts/` and on PATH. Host setup is automated by `bootstrap.ps1`.
 - **`hosts/alpine/`** — Production server setup: Caddy reverse proxy (auto HTTPS), Docker Compose for services, restic backups to Backblaze B2, UFW firewall, push-to-deploy via git hooks.
 
 ## Deployed Projects
@@ -65,7 +65,7 @@ There are no tests, linters, or build steps in this repo — it is pure configur
 | `timelite` | 8200 | Next.js + Bun (local-only, no backend) | no | no |
 | `isaacbythewood.com` | 8300 | Next.js + Bun (Pages Router, plain JS) | no | no |
 | `status` | 8400 | Django + Vite (Bun) + SQLite | yes | yes |
-| `darkfurrow.com` | 8500 | Flask (uv) | no | no |
+| `darkfurrow.com` | 8500 | Rust (axum) + Vite (Bun) | no | no |
 
 Update ports, repos, or flags by editing `projects.conf` and re-running the relevant provisioning step — every downstream artifact (Caddyfile routes, post-receive hooks, bootstrap script) is generated from this file.
 
