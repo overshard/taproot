@@ -1,7 +1,7 @@
 # webdev
 #
-# Ubuntu 24.04 dev container with tmux, neovim, claude code, Bun, uv, Docker
-# CLI, and Playwright Chromium. Used as a portable development environment
+# Ubuntu 24.04 dev container with tmux, neovim, claude code, Bun, uv, cargo,
+# Docker CLI, and Playwright Chromium. Used as a portable development environment
 # across desktop and laptop, with restic backups to Backblaze B2.
 #
 # Setup is automated by bootstrap.ps1 (idempotent, run from PowerShell on the
@@ -59,6 +59,8 @@ RUN apt-get update && \
         build-essential tzdata ca-certificates \
         # Python
         python3 python3-pip python3-venv \
+        # Rust (cargo for blog.bythewood.me, darkfurrow.com axum binaries)
+        rustc cargo \
         # WeasyPrint (PDF rendering for blog.bythewood.me)
         libpango-1.0-0 libpangoft2-1.0-0 libharfbuzz0b libharfbuzz-subset0 \
         # Docker
