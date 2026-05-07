@@ -36,26 +36,6 @@
 #
 
 analytics.bythewood.me {
-  handle /collect/ {
-    @options {
-      method OPTIONS
-    }
-
-    respond @options 204
-
-    header Access-Control-Allow-Origin *
-    header Access-Control-Allow-Methods *
-    header Access-Control-Allow-Headers *
-    header Access-Control-Max-Age 3153600
-  }
-
-  handle /media/* {
-    uri strip_prefix /media
-    file_server {
-      root /srv/data/analytics/media
-    }
-  }
-
   reverse_proxy localhost:8000
 
   import common
