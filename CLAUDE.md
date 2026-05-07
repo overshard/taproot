@@ -60,7 +60,7 @@ There are no tests, linters, or build steps in this repo — it is pure configur
 
 | Project | Port | Stack | Data dir | Migrations |
 |---|---|---|---|---|
-| `analytics` | 8000 | Django + Vite (Bun) + SQLite | yes | yes |
+| `analytics` | 8000 | Rust (axum) + Vite (Bun) + SQLite | yes | no |
 | `blog.bythewood.me` | 8100 | Rust (axum) + Vite (Bun) | no | no |
 | `timelite` | 8200 | Next.js + Bun (local-only, no backend) | no | no |
 | `isaacbythewood.com` | 8300 | Next.js + Bun (Pages Router, plain JS) | no | no |
