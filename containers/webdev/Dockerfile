@@ -47,7 +47,7 @@ ENV DEBIAN_FRONTEND=noninteractive \
     LANG=C.UTF-8 \
     LC_ALL=C.UTF-8 \
     TERM=xterm-256color \
-    PATH="/home/dev/.local/bin:$PATH"
+    PATH="/home/dev/.local/bin:/home/dev/.cargo/bin:$PATH"
 
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
@@ -59,8 +59,6 @@ RUN apt-get update && \
         build-essential tzdata ca-certificates \
         # Python
         python3 python3-pip python3-venv \
-        # Rust (cargo for blog.bythewood.me, darkfurrow.com axum binaries)
-        rustc cargo \
         # Docker (buildx enables BuildKit cache mounts in Dockerfiles)
         docker.io docker-compose-v2 docker-buildx && \
     curl -fsSL https://deb.nodesource.com/setup_22.x | bash - && \
@@ -68,9 +66,17 @@ RUN apt-get update && \
     curl -fsSL https://astral.sh/uv/install.sh | env UV_INSTALL_DIR=/usr/local/bin sh && \
     curl -fsSL https://bun.sh/install | env BUN_INSTALL=/usr/local bash
 
+# Playwright Chromium for the Claude playwright MCP. The MCP defaults to the
+# stable-Chrome discovery path /opt/google/chrome/chrome, so symlink the
+# version-pinned playwright build there. The find resolves chromium-NNNN at
+# build time, so a future playwright bump still produces a valid link.
 ENV PLAYWRIGHT_BROWSERS_PATH=/opt/playwright-browsers
 RUN npx --yes playwright@latest install --with-deps chromium && \
-    chmod -R a+rx /opt/playwright-browsers
+    chmod -R a+rx /opt/playwright-browsers && \
+    chrome_bin=$(find /opt/playwright-browsers -maxdepth 3 -path '*/chrome-linux64/chrome' | head -n 1) && \
+    test -x "$chrome_bin" && \
+    mkdir -p /opt/google/chrome && \
+    ln -snf "$chrome_bin" /opt/google/chrome/chrome
 
 RUN ln -snf /usr/share/zoneinfo/UTC /etc/localtime && echo "UTC" > /etc/timezone
 
@@ -140,6 +146,15 @@ RUN chmod +x /usr/local/bin/entrypoint.sh
 
 WORKDIR /home/dev
 USER dev
+
+# Rust toolchain via rustup (cargo for blog.bythewood.me, darkfurrow.com,
+# analytics axum binaries; rust-analyzer for the Claude Code LSP plugin).
+# --profile minimal skips offline rust-docs; components add the LSP, linter,
+# and formatter.
+RUN curl --proto '=https' --tlsv1.2 -fsSL https://sh.rustup.rs | \
+    sh -s -- -y --no-modify-path --profile minimal \
+        --default-toolchain stable \
+        --component rust-analyzer,clippy,rustfmt
 
 RUN curl -fsSL https://claude.ai/install.sh | bash
 
