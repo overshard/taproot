@@ -64,7 +64,7 @@ There are no tests, linters, or build steps in this repo — it is pure configur
 | `blog.bythewood.me` | 8100 | Rust (axum) + Vite (Bun) | no | no |
 | `timelite` | 8200 | Next.js + Bun (local-only, no backend) | no | no |
 | `isaacbythewood.com` | 8300 | Next.js + Bun (Pages Router, plain JS) | no | no |
-| `status` | 8400 | Django + Vite (Bun) + SQLite | yes | yes |
+| `status` | 8400 | Rust (axum) + Vite (Bun) + SQLite | yes | no |
 | `darkfurrow.com` | 8500 | Rust (axum) + Vite (Bun) | no | no |
 
 Update ports, repos, or flags by editing `projects.conf` and re-running the relevant provisioning step — every downstream artifact (Caddyfile routes, post-receive hooks, bootstrap script) is generated from this file.
