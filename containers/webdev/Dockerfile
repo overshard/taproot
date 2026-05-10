@@ -60,23 +60,21 @@ RUN apt-get update && \
         # Python
         python3 python3-pip python3-venv \
         # Docker (buildx enables BuildKit cache mounts in Dockerfiles)
-        docker.io docker-compose-v2 docker-buildx && \
-    curl -fsSL https://deb.nodesource.com/setup_22.x | bash - && \
-    apt-get install -y nodejs && \
+        docker.io docker-compose-v2 docker-buildx \
+        # Node (only used for `npx playwright install` below; bun is the JS runtime)
+        nodejs npm && \
     curl -fsSL https://astral.sh/uv/install.sh | env UV_INSTALL_DIR=/usr/local/bin sh && \
     curl -fsSL https://bun.sh/install | env BUN_INSTALL=/usr/local bash
 
-# Playwright Chromium for the Claude playwright MCP. The MCP defaults to the
-# stable-Chrome discovery path /opt/google/chrome/chrome, so symlink the
-# version-pinned playwright build there. The find resolves chromium-NNNN at
-# build time, so a future playwright bump still produces a valid link.
+# Playwright Chromium for the Claude playwright MCP. The MCP looks for stable
+# Chrome at /opt/google/chrome/chrome, so symlink the playwright build there.
+# The chromium-* glob absorbs future playwright revision bumps.
 ENV PLAYWRIGHT_BROWSERS_PATH=/opt/playwright-browsers
 RUN npx --yes playwright@latest install --with-deps chromium && \
     chmod -R a+rx /opt/playwright-browsers && \
-    chrome_bin=$(find /opt/playwright-browsers -maxdepth 3 -path '*/chrome-linux64/chrome' | head -n 1) && \
-    test -x "$chrome_bin" && \
     mkdir -p /opt/google/chrome && \
-    ln -snf "$chrome_bin" /opt/google/chrome/chrome
+    ln -snf /opt/playwright-browsers/chromium-*/chrome-linux64/chrome /opt/google/chrome/chrome && \
+    test -x /opt/google/chrome/chrome
 
 RUN ln -snf /usr/share/zoneinfo/UTC /etc/localtime && echo "UTC" > /etc/timezone
 
