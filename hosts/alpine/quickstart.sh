@@ -25,8 +25,7 @@ apk add \
     restic \
     docker \
     docker-cli-buildx \
-    docker-compose \
-    caddy
+    docker-compose
 
 # Configure firewall
 ufw allow 22/tcp
@@ -40,8 +39,6 @@ ufw --force enable
 cp etc/apk/repositories /etc/apk/repositories && chmod 644 /etc/apk/repositories
 cp etc/periodic/daily/apk-autoupgrade /etc/periodic/daily/apk-autoupgrade && chmod 700 /etc/periodic/daily/apk-autoupgrade
 cp etc/periodic/daily/restic-autobackup /etc/periodic/daily/restic-autobackup && chmod 700 /etc/periodic/daily/restic-autobackup
-cp etc/docker/daemon.json /etc/docker/daemon.json && chmod 644 /etc/docker/daemon.json
-cp etc/caddy/Caddyfile /etc/caddy/Caddyfile && chmod 644 /etc/caddy/Caddyfile
 cp root/server-health-check.sh /root/server-health-check.sh && chmod 700 /root/server-health-check.sh
 cp root/restore.sh /root/restore.sh && chmod 700 /root/restore.sh
 
@@ -56,11 +53,11 @@ echo "   /root/.restic/b2-env     exports B2_ACCOUNT_ID and B2_ACCOUNT_KEY (chmo
 echo ""
 
 # Provision each project from projects.conf
-while IFS='|' read -r name port repo branch has_data has_migrate; do
+while IFS='|' read -r name repo branch has_data has_migrate; do
     # Skip comments and blank lines
     case "$name" in \#*|"") continue ;; esac
 
-    echo "--- Provisioning $name on port $port ---"
+    echo "--- Provisioning $name ---"
 
     # Bare git repo for push-to-deploy
     if [ ! -d "/srv/git/${name}.git" ]; then
@@ -94,6 +91,7 @@ while read oldrev newrev ref; do
     cd /srv/docker/${name}
     git pull
     docker compose up --build --detach
+    docker network connect bythewood-edge ${name} 2>/dev/null || true
 HOOK
 
     if [ "$has_migrate" = "yes" ]; then
@@ -118,7 +116,20 @@ done < srv/projects.conf
 # Start services and add to startup
 rc-update add ufw boot && rc-service ufw start
 rc-update add docker boot && rc-service docker start
-rc-update add caddy boot && rc-service caddy start
+
+# Shared edge network: Caddy and every project's web container attach here so
+# Caddy can reverse_proxy by container name. Created idempotently; the
+# post-receive hooks reattach project containers after each rebuild.
+docker network create bythewood-edge 2>/dev/null || true
+
+# Caddy runs as a container, not on the host. Bind-mount the Caddyfile so
+# `docker compose exec caddy caddy reload` picks up edits without a rebuild.
+# /srv/data/caddy holds ACME certs and account keys; backed up via restic
+# along with every other /srv/data/<project>/ directory.
+mkdir -p /srv/docker/caddy /srv/data/caddy
+cp srv/caddy/docker-compose.yml /srv/docker/caddy/docker-compose.yml
+cp srv/caddy/Caddyfile /srv/docker/caddy/Caddyfile
+( cd /srv/docker/caddy && docker compose up --detach )
 
 echo ""
 echo "Server provisioned. Review .env files in /srv/docker/*/  before starting containers."

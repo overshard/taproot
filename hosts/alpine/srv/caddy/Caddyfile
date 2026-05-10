@@ -1,0 +1,118 @@
+#
+# Caddyfile
+#
+# The single gate. Every request enters here.
+#
+# Caddy runs as a container on the bythewood-edge network. Each project's
+# web container is attached to that same network by its post-receive hook,
+# so upstreams are reached by container name on port 8000.
+#
+
+
+#
+# Common
+#
+
+(common) {
+  header /static/* {
+    Cache-Control "public, max-age=31536000, immutable"
+  }
+
+  header {
+    Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+    Referrer-Policy "strict-origin-when-cross-origin"
+    Permissions-Policy "interest-cohort=()"
+    X-Frame-Options DENY
+    X-Content-Type-Options nosniff
+    -Server
+    -X-Powered-By
+  }
+
+  encode zstd gzip
+}
+
+
+#
+# Analytics
+#
+
+analytics.bythewood.me {
+  reverse_proxy analytics:8000
+
+  import common
+}
+
+
+#
+# Blog
+#
+
+blog.bythewood.me {
+  header /content/images/* {
+    Cache-Control "public, max-age=31536000, immutable"
+  }
+
+  reverse_proxy blog.bythewood.me:8000
+
+  import common
+}
+
+
+#
+# Status
+#
+
+status.bythewood.me {
+  reverse_proxy status:8000
+
+  import common
+}
+
+
+#
+# Timelite
+#
+
+timelite.bythewood.me {
+  reverse_proxy timelite:8000
+
+  import common
+}
+
+timelite.app, www.timelite.app {
+  redir https://timelite.bythewood.me permanent
+}
+
+
+#
+# Dark Furrow
+#
+
+darkfurrow.com {
+  reverse_proxy darkfurrow.com:8000
+
+  import common
+}
+
+www.darkfurrow.com {
+  redir https://darkfurrow.com permanent
+}
+
+
+#
+# Isaac Bythewood
+#
+
+isaacbythewood.com {
+  reverse_proxy isaacbythewood.com:8000
+
+  import common
+}
+
+www.isaacbythewood.com {
+  redir https://isaacbythewood.com permanent
+}
+
+bythewood.me, www.bythewood.me {
+  redir https://isaacbythewood.com permanent
+}

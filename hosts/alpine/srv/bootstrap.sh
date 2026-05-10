@@ -26,7 +26,7 @@ fi
 echo "Bootstrapping code directory: $CODE_DIR"
 echo ""
 
-while IFS='|' read -r name port repo branch has_data has_migrate; do
+while IFS='|' read -r name repo branch has_data has_migrate; do
     case "$name" in \#*|"") continue ;; esac
 
     if [ -d "$CODE_DIR/$name" ]; then

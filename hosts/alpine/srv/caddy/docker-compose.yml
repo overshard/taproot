@@ -1,0 +1,20 @@
+services:
+  caddy:
+    image: caddy:2-alpine
+    container_name: caddy
+    init: true
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - /srv/data/caddy:/data
+    networks:
+      - edge
+
+networks:
+  edge:
+    name: bythewood-edge
+    external: true

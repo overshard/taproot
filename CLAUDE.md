@@ -51,27 +51,27 @@ There are no tests, linters, or build steps in this repo — it is pure configur
   - `dotfiles/host/zed-settings.json` -> `%APPDATA%\Zed\settings.json`
   - `dotfiles/host/ssh-config` -> `~\.ssh\config` (merge into existing entries if you have other Hosts already configured)
 - **`containers/webdev/`** — Ubuntu 24.04 dev container with Node 22, Python 3 (pip + uv), Bun, Rust (rustup-managed stable toolchain with rust-analyzer, clippy, rustfmt — for the axum projects and the Claude Code rust-analyzer LSP plugin), Docker CLI, Playwright Chromium (under `/opt/playwright-browsers`, for the Claude playwright MCP), and standard dev tools (neovim, tmux, git, rsync, htop, nmap, unzip, etc.). Stays alive via `sleep infinity`; entered through `docker exec -it ... tmux` for the TUI workflow or over SSH on host port 2222 for editor remote-dev. `entrypoint.sh` starts sshd before exec'ing CMD; host keys persist in the `bythewood-ssh` volume so fingerprints survive rebuilds. Started with `docker run --init` so PID 1 reaps zombies left behind when tmux/sshd children exit. Helper scripts (`restic-backup`, `restic-restore`, `restic-status`, `code-sync`, `server-health-check`) are baked in at `/home/dev/scripts/` and on PATH. Host setup is automated by `bootstrap.ps1`.
-- **`hosts/alpine/`** — Production server setup: Caddy reverse proxy (auto HTTPS), Docker Compose for services, restic backups to Backblaze B2, UFW firewall, push-to-deploy via git hooks.
+- **`hosts/alpine/`** — Production server setup: Caddy (in Docker, auto HTTPS) on the shared `bythewood-edge` network for reverse-proxying, Docker Compose for services, restic backups to Backblaze B2, UFW firewall, push-to-deploy via git hooks.
 
 ## Deployed Projects
 
 `hosts/alpine/srv/projects.conf` is the single source of truth. Format per line:
-`name|port|github_repo|branch|has_data_dir|runs_migrations`. Current manifest:
+`name|github_repo|branch|has_data_dir|runs_migrations`. Current manifest:
 
-| Project | Port | Stack | Data dir | Migrations |
-|---|---|---|---|---|
-| `analytics` | 8000 | Rust (axum) + Vite (Bun) + SQLite | yes | no |
-| `blog.bythewood.me` | 8100 | Rust (axum) + Vite (Bun) | no | no |
-| `timelite` | 8200 | Next.js + Bun (local-only, no backend) | no | no |
-| `isaacbythewood.com` | 8300 | Next.js + Bun (Pages Router, plain JS) | no | no |
-| `status` | 8400 | Rust (axum) + Vite (Bun) + SQLite | yes | no |
-| `darkfurrow.com` | 8500 | Rust (axum) + Vite (Bun) | no | no |
+| Project | Stack | Data dir | Migrations |
+|---|---|---|---|
+| `analytics` | Rust (axum) + Vite (Bun) + SQLite | yes | no |
+| `blog.bythewood.me` | Rust (axum) + Vite (Bun) | no | no |
+| `timelite` | Next.js + Bun (local-only, no backend) | no | no |
+| `isaacbythewood.com` | Next.js + Bun (Pages Router, plain JS) | no | no |
+| `status` | Rust (axum) + Vite (Bun) + SQLite | yes | no |
+| `darkfurrow.com` | Rust (axum) + Vite (Bun) | no | no |
 
-Update ports, repos, or flags by editing `projects.conf` and re-running the relevant provisioning step — every downstream artifact (Caddyfile routes, post-receive hooks, bootstrap script) is generated from this file.
+Every container listens on 8000 internally; Caddy reaches them by container name on the shared `bythewood-edge` Docker network, so there's no per-project port. Update repos or flags by editing `projects.conf` and re-running the relevant provisioning step. Post-receive hooks and the bootstrap script are generated from this file; the Caddyfile is hand-maintained at `srv/caddy/Caddyfile`.
 
 ## How Deployment Works
 
-`quickstart.sh` reads `projects.conf` and generates one bare repo under `/srv/git/<name>.git/` per project with a post-receive hook. Pushing to that remote triggers: `git pull`, `docker compose up --build --detach`, optional `manage.py migrate`, and `docker system prune`. The Caddyfile proxies each project's subdomain to its bound port on `127.0.0.1`.
+`quickstart.sh` reads `projects.conf` and generates one bare repo under `/srv/git/<name>.git/` per project with a post-receive hook. Pushing to that remote triggers: `git pull`, `docker compose up --build --detach`, `docker network connect bythewood-edge <name>` (idempotent, since `compose up` recreates the container and drops external attachments), optional `manage.py migrate`, and `docker system prune`. Caddy itself runs as a container under `/srv/docker/caddy/` and is brought up once by `quickstart.sh`; ACME certs and account keys persist at `/srv/data/caddy/` (so they're covered by the daily restic snapshot), and Caddyfile edits get picked up via `docker compose exec caddy caddy reload --config /etc/caddy/Caddyfile`.
 
 ## Conventions
 
@@ -79,4 +79,4 @@ Update ports, repos, or flags by editing `projects.conf` and re-running the rele
 - Shell scripts target POSIX sh for Alpine compatibility
 - Git is configured for rebase-on-pull
 - Container volumes use `bythewood-*` prefix
-- Docker daemon iptables are disabled; UFW handles firewall rules instead
+- Only Caddy publishes host ports (80, 443, 443/udp). Every other container is reached through the shared `bythewood-edge` Docker network. UFW manages the host firewall; do not add `ports:` to a project compose file or it will be exposed publicly via Docker's iptables NAT
