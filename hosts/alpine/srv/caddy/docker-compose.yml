@@ -12,7 +12,24 @@ services:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
       - /srv/data/caddy:/data
     networks:
-      - edge
+      edge:
+        # Aliases let other containers on bythewood-edge resolve each public
+        # hostname to caddy's bridge IP via Docker's embedded DNS, so probes
+        # from status (and any other internal client) reach caddy directly
+        # without bouncing through the host's public IP. Without this, the
+        # host-IP path requires hairpin DNAT, which Docker's default bridge
+        # does not reliably do, so internal probes hang and time out.
+        aliases:
+          - analytics.bythewood.me
+          - blog.bythewood.me
+          - status.bythewood.me
+          - timelite.bythewood.me
+          - darkfurrow.com
+          - www.darkfurrow.com
+          - isaacbythewood.com
+          - www.isaacbythewood.com
+          - bythewood.me
+          - www.bythewood.me
 
 networks:
   edge:
