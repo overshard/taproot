@@ -23,11 +23,13 @@ taproot/
 │   └── webdev/
 │       ├── Dockerfile              the vessel — Ubuntu 24.04 dev image
 │       ├── bootstrap.ps1           one-shot host setup (Windows)
-│       ├── restic-backup.sh        manual restic snapshot to B2
-│       ├── restic-restore.sh       pull latest snapshot from B2
-│       ├── restic-status.sh        last snapshot per host across repos
-│       ├── code-sync.sh            pull existing repos + clone new ones from GitHub
-│       └── server-health-check.sh  ssh into alpine and run its health check
+│       ├── entrypoint.sh           starts sshd, then exec's CMD
+│       └── scripts/                copied to ~/scripts/ in the container
+│           ├── restic-backup.sh        manual restic snapshot to B2
+│           ├── restic-restore.sh       pull latest snapshot from B2
+│           ├── restic-status.sh        last snapshot per host across repos
+│           ├── code-sync.sh            pull existing repos + clone new ones from GitHub
+│           └── server-health-check.sh  ssh into alpine and run its health check
 └── hosts/
     └── alpine/
         ├── quickstart.sh           provision a fresh server

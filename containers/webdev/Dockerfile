@@ -119,12 +119,9 @@ RUN mkdir -p /home/dev/code /home/dev/.claude /home/dev/.ssh /home/dev/.restic &
     chmod 600 /home/dev/.ssh/config && \
     chown -R dev:dev /home/dev/code /home/dev/.claude /home/dev/.ssh /home/dev/.restic
 
-COPY containers/webdev/restic-backup.sh /home/dev/scripts/restic-backup
-COPY containers/webdev/restic-restore.sh /home/dev/scripts/restic-restore
-COPY containers/webdev/restic-status.sh /home/dev/scripts/restic-status
-COPY containers/webdev/code-sync.sh /home/dev/scripts/code-sync
-COPY containers/webdev/server-health-check.sh /home/dev/scripts/server-health-check
-RUN chmod +x /home/dev/scripts/* && \
+COPY containers/webdev/scripts/ /home/dev/scripts/
+RUN for f in /home/dev/scripts/*.sh; do mv "$f" "${f%.sh}"; done && \
+    chmod +x /home/dev/scripts/* && \
     chown -R dev:dev /home/dev/scripts
 
 # sshd setup. Host keys are NOT generated here — the entrypoint creates them
