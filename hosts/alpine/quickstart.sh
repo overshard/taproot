@@ -16,7 +16,6 @@ apk update
 apk upgrade
 apk add \
     neovim \
-    curl \
     rsync \
     git \
     ip6tables \
