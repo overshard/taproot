@@ -71,7 +71,7 @@ Every container listens on 8000 internally; Caddy reaches them by container name
 
 ## How Deployment Works
 
-`quickstart.sh` reads `projects.conf` and generates one bare repo under `/srv/git/<name>.git/` per project with a post-receive hook. Pushing to that remote triggers: `git pull`, `docker compose up --build --detach`, `docker network connect bythewood-edge <name>` (idempotent, since `compose up` recreates the container and drops external attachments), optional `manage.py migrate`, and `docker system prune`. Caddy itself runs as a container under `/srv/docker/caddy/` and is brought up once by `quickstart.sh`; ACME certs and account keys persist at `/srv/data/caddy/` (so they're covered by the daily restic snapshot), and Caddyfile edits get picked up via `docker compose exec caddy caddy reload --config /etc/caddy/Caddyfile`.
+`quickstart.sh` reads `projects.conf` and generates one bare repo under `/srv/git/<name>.git/` per project with a post-receive hook. Pushing to that remote triggers: `git pull`, `docker compose up --build --detach`, then `docker network connect bythewood-edge <cid>` for every container ID returned by `docker compose ps -q` (resolved that way, not by name, so the attach works regardless of compose service name or `container_name`; idempotent because `compose up` recreates containers and drops external attachments), optional `manage.py migrate`, and `docker system prune`. Caddy itself runs as a container under `/srv/docker/caddy/` and is brought up once by `quickstart.sh`; ACME certs and account keys persist at `/srv/data/caddy/` (so they're covered by the daily restic snapshot), and Caddyfile edits get picked up via `docker compose exec caddy caddy reload --config /etc/caddy/Caddyfile`.
 
 ## Conventions
 

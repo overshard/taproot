@@ -90,7 +90,12 @@ while read oldrev newrev ref; do
     cd /srv/docker/${name}
     git pull
     docker compose up --build --detach
-    docker network connect bythewood-edge ${name} 2>/dev/null || true
+    # Reattach every container in the project to the shared edge network.
+    # Resolved via \`compose ps\` (not \`${name}\`) so this works regardless
+    # of the compose service name or container_name override.
+    for cid in \$(docker compose ps -q); do
+      docker network connect bythewood-edge "\$cid" 2>/dev/null || true
+    done
 HOOK
 
     if [ "$has_migrate" = "yes" ]; then

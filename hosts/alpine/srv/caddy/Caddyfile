@@ -52,7 +52,7 @@ blog.bythewood.me {
     Cache-Control "public, max-age=31536000, immutable"
   }
 
-  reverse_proxy blog.bythewood.me:8000
+  reverse_proxy blog:8000
 
   import common
 }
@@ -89,7 +89,7 @@ timelite.app, www.timelite.app {
 #
 
 darkfurrow.com {
-  reverse_proxy darkfurrow.com:8000
+  reverse_proxy darkfurrow:8000
 
   import common
 }
@@ -104,7 +104,7 @@ www.darkfurrow.com {
 #
 
 isaacbythewood.com {
-  reverse_proxy isaacbythewood.com:8000
+  reverse_proxy isaacbythewood:8000
 
   import common
 }
