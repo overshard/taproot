@@ -113,6 +113,17 @@ www.isaacbythewood.com {
   redir https://isaacbythewood.com permanent
 }
 
+
+#
+# Heartwood
+#
+
+heartwood.bythewood.me {
+  reverse_proxy heartwood:8000
+
+  import common
+}
+
 bythewood.me, www.bythewood.me {
   redir https://isaacbythewood.com permanent
 }

@@ -67,6 +67,7 @@ There are no tests, linters, or build steps in this repo — it is pure configur
 | `isaacbythewood.com` | Next.js + Bun (Pages Router, plain JS) | no | no |
 | `status` | Rust (axum) + Vite (Bun) + SQLite | yes | no |
 | `darkfurrow.com` | Rust (axum) + Vite (Bun) | no | no |
+| `heartwood` | Rust (axum) + Vite (Bun) | no | no |
 
 Every container listens on 8000 internally; Caddy reaches them by container name on the shared `bythewood-edge` Docker network, so there's no per-project port. Update repos or flags by editing `projects.conf` and re-running the relevant provisioning step. Post-receive hooks and the bootstrap script are generated from this file; the Caddyfile is hand-maintained at `srv/caddy/Caddyfile`.
 
