@@ -124,6 +124,17 @@ repos.bythewood.me {
   import common
 }
 
+
+#
+# Finance
+#
+
+finance.bythewood.me {
+  reverse_proxy finance:8000
+
+  import common
+}
+
 bythewood.me, www.bythewood.me {
   redir https://isaacbythewood.com permanent
 }

@@ -22,6 +22,7 @@ services:
         aliases:
           - analytics.bythewood.me
           - blog.bythewood.me
+          - finance.bythewood.me
           - status.bythewood.me
           - timelite.bythewood.me
           - darkfurrow.com
