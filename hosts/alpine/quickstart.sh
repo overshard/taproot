@@ -68,9 +68,12 @@ while IFS='|' read -r name repo branch has_data has_migrate; do
         git clone "git@github.com:${repo}.git" "/srv/docker/${name}" -b "$branch"
     fi
 
-    # Data directory
+    # Data directory. Owned by uid 1000: every project container runs as a
+    # non-root uid-1000 user, and a bind mount keeps the host dir's
+    # ownership, so a root-owned dir leaves the app unable to write its db.
     if [ "$has_data" = "yes" ] && [ ! -d "/srv/data/${name}" ]; then
         mkdir -p "/srv/data/${name}"
+        chown 1000:1000 "/srv/data/${name}"
     fi
 
     # .env file from sample if it exists
