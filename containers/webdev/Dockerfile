@@ -151,6 +151,13 @@ RUN curl --proto '=https' --tlsv1.2 -fsSL https://sh.rustup.rs | \
         --default-toolchain stable \
         --component rust-analyzer,clippy,rustfmt
 
+# Source ~/.cargo/bin onto PATH from the rc files. The ENV PATH above covers
+# `docker exec`, but SSH logins (port 2222) build their own environment and
+# don't inherit it, so without this the rust-analyzer LSP plugin can't find
+# its binary. .cargo/env is self-guarded, so sourcing twice is a no-op.
+RUN echo '. "$HOME/.cargo/env"' >> /home/dev/.bashrc \
+    && echo '[ -f "$HOME/.cargo/env" ] && . "$HOME/.cargo/env"' >> /home/dev/.profile
+
 RUN curl -fsSL https://claude.ai/install.sh | bash
 
 ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
