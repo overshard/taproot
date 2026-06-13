@@ -10,7 +10,7 @@
 # key in, and prompts for restic creds. Taproot itself does not need to be on
 # the host; everything operates against the bythewood-code volume.
 #
-#     irm https://raw.githubusercontent.com/overshard/taproot/master/containers/webdev/bootstrap.ps1 -OutFile bootstrap.ps1
+#     irm https://raw.githubusercontent.com/overshard/taproot/main/containers/webdev/bootstrap.ps1 -OutFile bootstrap.ps1
 #     powershell -ExecutionPolicy Bypass -File .\bootstrap.ps1 laptop      # or "desktop"
 #     powershell -ExecutionPolicy Bypass -File .\bootstrap.ps1 laptop -Restore   # also pulls B2 snapshot
 #

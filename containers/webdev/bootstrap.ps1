@@ -21,7 +21,7 @@
     First-time machine setup (assumes Docker Desktop is running and you have
     an SSH key at $HOME/.ssh/home_key added to GitHub):
 
-        irm https://raw.githubusercontent.com/overshard/taproot/master/containers/webdev/bootstrap.ps1 -OutFile bootstrap.ps1
+        irm https://raw.githubusercontent.com/overshard/taproot/main/containers/webdev/bootstrap.ps1 -OutFile bootstrap.ps1
         powershell -ExecutionPolicy Bypass -File .\bootstrap.ps1 laptop
 
     The Bypass flag is needed because PowerShell's default execution policy
@@ -98,7 +98,7 @@ function Should-Run { param([string]$Name) return (-not $Only) -or ($Only -eq $N
 # Does the bythewood-ssh volume already hold a usable home_key? On a machine
 # that's been set up before (or restored from B2), the deploy key already lives
 # in the volume, so we don't need a host-side copy at all. The volume may not
-# exist yet on a truly fresh machine — an inspect failure just means "absent".
+# exist yet on a truly fresh machine; an inspect failure just means "absent".
 function Test-VolumeKey {
     docker volume inspect bythewood-ssh 2>$null 1>$null
     if ($LASTEXITCODE -ne 0) { return $false }
@@ -119,14 +119,14 @@ function Step-Prereqs {
     # The host key is only needed to authenticate git against GitHub (cloning /
     # pulling taproot). If it isn't on the host but the bythewood-ssh volume
     # already has one, the clone helper borrows that and we never copy a fresh
-    # key in. Only a genuinely fresh machine — no host key AND empty volume —
+    # key in. Only a genuinely fresh machine (no host key and an empty volume)
     # has nothing to authenticate with.
     if ((Test-Path $HostKeyPath) -and (Test-Path $HostKeyPubPath)) {
         Done "SSH key found at $HostKeyPath"
         return
     }
     if (Test-VolumeKey) {
-        Skip "no host key, but home_key already in bythewood-ssh volume — using that"
+        Skip "no host key, but home_key already in bythewood-ssh volume; using that"
         return
     }
     Fail @"
@@ -167,7 +167,7 @@ function Invoke-Helper-Clone {
     # host has one, bind-mount that file directly; otherwise mount the
     # bythewood-ssh volume (set up on a previous run) and read its key. Either
     # way we copy it into the helper user's $HOME and chmod 600 before invoking
-    # git — Windows NTFS has no unix mode to carry over, so a bind-mounted host
+    # git. Windows NTFS has no unix mode to carry over, so a bind-mounted host
     # key lands at 0777, which ssh refuses, and the volume key is owned by uid
     # 1001 which root in the helper can read but git wants at 600 anyway.
     $gitOp = if ($Action -eq "clone") {
@@ -301,7 +301,7 @@ function Step-Ssh {
         Skip "home_key already in volume"
     } elseif (-not ((Test-Path $HostKeyPath) -and (Test-Path $HostKeyPubPath))) {
         # Volume key is incomplete but there's no host key to copy from. Nothing
-        # to do here — the clone/pull already authenticated with whatever the
+        # to do here: the clone/pull already authenticated with whatever the
         # volume had, so don't fail; just fall through to the perms fix-up.
         Skip "no host key to copy; leaving volume's key as-is"
     } else {

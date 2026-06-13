@@ -66,7 +66,7 @@ Prereqs: Docker Desktop installed and running, an SSH key at
 `$HOME\.ssh\home_key` (and `.pub`) added to GitHub. Nothing else.
 
 ```powershell
-irm https://raw.githubusercontent.com/overshard/taproot/master/containers/webdev/bootstrap.ps1 -OutFile bootstrap.ps1
+irm https://raw.githubusercontent.com/overshard/taproot/main/containers/webdev/bootstrap.ps1 -OutFile bootstrap.ps1
 powershell -ExecutionPolicy Bypass -File .\bootstrap.ps1 laptop
 ```
 
