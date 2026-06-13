@@ -95,6 +95,18 @@ function Fail   { param([string]$M) Write-Host "  [fail] $M" -ForegroundColor Re
 function Should-Run { param([string]$Name) return (-not $Only) -or ($Only -eq $Name) }
 
 # ---------------------------------------------------------------------------
+# Does the bythewood-ssh volume already hold a usable home_key? On a machine
+# that's been set up before (or restored from B2), the deploy key already lives
+# in the volume, so we don't need a host-side copy at all. The volume may not
+# exist yet on a truly fresh machine — an inspect failure just means "absent".
+function Test-VolumeKey {
+    docker volume inspect bythewood-ssh 2>$null 1>$null
+    if ($LASTEXITCODE -ne 0) { return $false }
+    docker run --rm --volume "bythewood-ssh:/ssh:ro" $HelperImage `
+        sh -c "test -f /ssh/home_key" 2>$null 1>$null
+    return ($LASTEXITCODE -eq 0)
+}
+
 function Step-Prereqs {
     Step-Banner "prereqs"
     try {
@@ -104,17 +116,28 @@ function Step-Prereqs {
         Fail "Docker Desktop is not running. Start it and re-run."
     }
 
-    if (-not (Test-Path $HostKeyPath) -or -not (Test-Path $HostKeyPubPath)) {
-        Fail @"
-SSH key not found at $HostKeyPath (.pub).
+    # The host key is only needed to authenticate git against GitHub (cloning /
+    # pulling taproot). If it isn't on the host but the bythewood-ssh volume
+    # already has one, the clone helper borrows that and we never copy a fresh
+    # key in. Only a genuinely fresh machine — no host key AND empty volume —
+    # has nothing to authenticate with.
+    if ((Test-Path $HostKeyPath) -and (Test-Path $HostKeyPubPath)) {
+        Done "SSH key found at $HostKeyPath"
+        return
+    }
+    if (Test-VolumeKey) {
+        Skip "no host key, but home_key already in bythewood-ssh volume — using that"
+        return
+    }
+    Fail @"
+SSH key not found at $HostKeyPath (.pub), and none in the bythewood-ssh volume.
 Set up your keys first:
     ssh-keygen -t ed25519 -f `"$HostKeyPath`" -C bythewood-webdev
 Then add the public key to GitHub:
     Get-Content `"$HostKeyPubPath`" | clip
 Paste at https://github.com/settings/ssh/new
+(Or restore the bythewood-ssh volume from B2 with -Restore if you have a snapshot.)
 "@
-    }
-    Done "SSH key found at $HostKeyPath"
 }
 
 # ---------------------------------------------------------------------------
@@ -140,9 +163,13 @@ function Invoke-Helper-Clone {
     # Dockerfile does `useradd dev` it gets UID 1001 (next available). Files
     # created here as 1001 match dev inside webdev with no chown gymnastics.
     #
-    # The host SSH key is bind-mounted read-only at /keys/home_key. Windows
-    # NTFS has no unix mode to copy, so it lands at 0777 which ssh refuses.
-    # We copy it into the helper user's $HOME and chmod 600 before invoking git.
+    # The deploy key is mounted read-only at /keys/home_key. Two sources: if the
+    # host has one, bind-mount that file directly; otherwise mount the
+    # bythewood-ssh volume (set up on a previous run) and read its key. Either
+    # way we copy it into the helper user's $HOME and chmod 600 before invoking
+    # git — Windows NTFS has no unix mode to carry over, so a bind-mounted host
+    # key lands at 0777, which ssh refuses, and the volume key is owned by uid
+    # 1001 which root in the helper can read but git wants at 600 anyway.
     $gitOp = if ($Action -eq "clone") {
         "git clone --branch $TaprootBranch $TaprootRepo /code/taproot"
     } else {
@@ -162,11 +189,21 @@ chown -R 1001:1001 /home/devhelper /code
 sudo -u devhelper -E env GIT_SSH_COMMAND='ssh -i /home/devhelper/.ssh/home_key -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new -o UserKnownHostsFile=/tmp/known_hosts' sh -c '$gitOp'
 "@
 
-    docker run --rm `
-        --volume "${HostKeyPath}:/keys/home_key:ro" `
-        --volume "bythewood-code:/code" `
-        $HelperImage `
-        sh -c $script
+    # Key source: the host file when present, else the bythewood-ssh volume.
+    # Both expose the key to the helper at /keys/home_key (the volume mount
+    # lands it at /keys/home_key since the volume's root holds home_key).
+    $keyMount = if (Test-Path $HostKeyPath) {
+        @("--volume", "${HostKeyPath}:/keys/home_key:ro")
+    } else {
+        @("--volume", "bythewood-ssh:/keys:ro")
+    }
+
+    $dockerArgs = @("run", "--rm") + $keyMount + @(
+        "--volume", "bythewood-code:/code",
+        $HelperImage,
+        "sh", "-c", $script
+    )
+    docker @dockerArgs
 
     if ($LASTEXITCODE -ne 0) { Fail "helper container failed during '$Action'" }
 }
@@ -262,18 +299,22 @@ function Step-Ssh {
 
     if ($keyOk -and $pubOk) {
         Skip "home_key already in volume"
+    } elseif (-not ((Test-Path $HostKeyPath) -and (Test-Path $HostKeyPubPath))) {
+        # Volume key is incomplete but there's no host key to copy from. Nothing
+        # to do here — the clone/pull already authenticated with whatever the
+        # volume had, so don't fail; just fall through to the perms fix-up.
+        Skip "no host key to copy; leaving volume's key as-is"
     } else {
         docker cp $HostKeyPath "${ContainerName}:/home/dev/.ssh/home_key" | Out-Null
         docker cp $HostKeyPubPath "${ContainerName}:/home/dev/.ssh/home_key.pub" | Out-Null
         Done "copied home_key + home_key.pub into bythewood-ssh volume"
     }
 
-    # Always (re)apply ownership and perms. docker cp from Windows hosts loses
-    # mode info, and pre-existing keys from earlier manual setups may have been
-    # left at 0777, which ssh refuses ("unprotected private key file").
-    docker exec $ContainerName sudo chown dev:dev /home/dev/.ssh/home_key /home/dev/.ssh/home_key.pub | Out-Null
-    docker exec $ContainerName sudo chmod 600 /home/dev/.ssh/home_key | Out-Null
-    docker exec $ContainerName sudo chmod 644 /home/dev/.ssh/home_key.pub | Out-Null
+    # Always (re)apply ownership and perms on whatever key is present. docker cp
+    # from Windows hosts loses mode info, and pre-existing keys from earlier
+    # manual setups may have been left at 0777, which ssh refuses ("unprotected
+    # private key file"). Guarded with `-f` so a missing pub doesn't error.
+    docker exec $ContainerName sh -c 'cd /home/dev/.ssh && sudo chown dev:dev home_key home_key.pub 2>/dev/null; [ -f home_key ] && sudo chmod 600 home_key; [ -f home_key.pub ] && sudo chmod 644 home_key.pub' | Out-Null
     Done "verified perms (key 600, pub 644)"
 }
 
