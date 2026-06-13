@@ -28,11 +28,6 @@
     blocks scripts downloaded from the internet. It only applies to this one
     invocation; nothing on your system changes.
 
-    Host-side dotfiles (Zed settings, ~/.ssh/config) are NOT managed by this
-    script. After taproot is in the bythewood-code volume, copy them by hand:
-        dotfiles/host/zed-settings.json -> $env:APPDATA\Zed\settings.json
-        dotfiles/host/ssh-config        -> $HOME\.ssh\config
-
     Subsequent runs (from inside the cloned-in-volume taproot is fine; the
     script doesn't depend on its own location):
 
@@ -146,7 +141,7 @@ function Invoke-Helper-Clone {
     # created here as 1001 match dev inside webdev with no chown gymnastics.
     #
     # The host SSH key is bind-mounted read-only at /keys/home_key. Windows
-    # NTFS has no unix mode to copy, so it lands at 0777 which sshd refuses.
+    # NTFS has no unix mode to copy, so it lands at 0777 which ssh refuses.
     # We copy it into the helper user's $HOME and chmod 600 before invoking git.
     $gitOp = if ($Action -eq "clone") {
         "git clone --branch $TaprootBranch $TaprootRepo /code/taproot"
@@ -251,7 +246,6 @@ function Step-Container {
         "--volume", "bythewood-restic:/home/dev/.restic",
         "--volume", "/var/run/docker.sock:/var/run/docker.sock",
         "-p", "8000:8000",
-        "-p", "2222:22",
         $ImageName
     )
     docker @dockerArgs | Out-Null
@@ -276,7 +270,7 @@ function Step-Ssh {
 
     # Always (re)apply ownership and perms. docker cp from Windows hosts loses
     # mode info, and pre-existing keys from earlier manual setups may have been
-    # left at 0777, which sshd refuses ("unprotected private key file").
+    # left at 0777, which ssh refuses ("unprotected private key file").
     docker exec $ContainerName sudo chown dev:dev /home/dev/.ssh/home_key /home/dev/.ssh/home_key.pub | Out-Null
     docker exec $ContainerName sudo chmod 600 /home/dev/.ssh/home_key | Out-Null
     docker exec $ContainerName sudo chmod 644 /home/dev/.ssh/home_key.pub | Out-Null
@@ -396,4 +390,3 @@ if (Should-Run "restore")          { Step-Restore }
 Write-Host ""
 Write-Host "Done." -ForegroundColor Green
 Write-Host "Connect with:  docker exec -it $ContainerName tmux"
-Write-Host "Or via SSH:    ssh -p 2222 dev@localhost"

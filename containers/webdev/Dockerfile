@@ -6,16 +6,15 @@
 #
 # Setup is automated by bootstrap.ps1 (idempotent, run from PowerShell on the
 # host). It creates volumes, clones taproot into bythewood-code via a helper
-# container, builds this image, runs the container, copies the host SSH key
-# in, and prompts for restic creds. Taproot itself does not need to be on
+# container, builds this image, runs the container, copies the host git SSH
+# key in, and prompts for restic creds. Taproot itself does not need to be on
 # the host; everything operates against the bythewood-code volume.
 #
 #     irm https://raw.githubusercontent.com/overshard/taproot/master/containers/webdev/bootstrap.ps1 -OutFile bootstrap.ps1
 #     powershell -ExecutionPolicy Bypass -File .\bootstrap.ps1 laptop      # or "desktop"
 #     powershell -ExecutionPolicy Bypass -File .\bootstrap.ps1 laptop -Restore   # also pulls B2 snapshot
 #
-# Connect (TUI):    docker exec -it bythewood-webdev tmux
-# Connect (SSH):    ssh -p 2222 dev@localhost
+# Connect:    docker exec -it bythewood-webdev tmux
 #
 # Helper scripts inside the container (in PATH at /home/dev/scripts/):
 #     restic-backup        manual restic backup to B2
@@ -52,7 +51,7 @@ ENV DEBIAN_FRONTEND=noninteractive \
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
         # Dev tools
-        curl git rsync neovim openssh-client openssh-server tmux whois nmap unzip htop tree sudo jq \
+        curl git rsync neovim openssh-client tmux whois nmap unzip htop tree sudo jq \
         # Backups
         restic \
         # Build tools
@@ -122,23 +121,6 @@ RUN for f in /home/dev/scripts/*.sh; do mv "$f" "${f%.sh}"; done && \
     chmod +x /home/dev/scripts/* && \
     chown -R dev:dev /home/dev/scripts
 
-# sshd setup. Host keys are NOT generated here — the entrypoint creates them
-# in the .ssh volume on first start so fingerprints survive image rebuilds.
-# pam_loginuid is downgraded to optional because containers don't have
-# CAP_AUDIT_WRITE by default and the default `required` makes logins fail.
-RUN mkdir -p /run/sshd && \
-    sed -i 's/session\s*required\s*pam_loginuid\.so/session optional pam_loginuid.so/g' /etc/pam.d/sshd && \
-    printf '%s\n' \
-        'PermitRootLogin no' \
-        'PasswordAuthentication no' \
-        'PubkeyAuthentication yes' \
-        'AllowUsers dev' \
-        'HostKey /home/dev/.ssh/host_keys/ssh_host_ed25519_key' \
-        > /etc/ssh/sshd_config.d/webdev.conf
-
-COPY containers/webdev/entrypoint.sh /usr/local/bin/entrypoint.sh
-RUN chmod +x /usr/local/bin/entrypoint.sh
-
 WORKDIR /home/dev
 USER dev
 
@@ -151,14 +133,6 @@ RUN curl --proto '=https' --tlsv1.2 -fsSL https://sh.rustup.rs | \
         --default-toolchain stable \
         --component rust-analyzer,clippy,rustfmt
 
-# Source ~/.cargo/bin onto PATH from the rc files. The ENV PATH above covers
-# `docker exec`, but SSH logins (port 2222) build their own environment and
-# don't inherit it, so without this the rust-analyzer LSP plugin can't find
-# its binary. .cargo/env is self-guarded, so sourcing twice is a no-op.
-RUN echo '. "$HOME/.cargo/env"' >> /home/dev/.bashrc \
-    && echo '[ -f "$HOME/.cargo/env" ] && . "$HOME/.cargo/env"' >> /home/dev/.profile
-
 RUN curl -fsSL https://claude.ai/install.sh | bash
 
-ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
 CMD ["sleep", "infinity"]

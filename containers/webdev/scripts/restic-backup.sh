@@ -41,7 +41,6 @@ restic backup \
     --verbose \
     --host="$RESTIC_HOST" \
     --exclude-caches \
-    --exclude='host_keys' \
     --exclude='node_modules' \
     --exclude='.next' \
     --exclude='.venv' \

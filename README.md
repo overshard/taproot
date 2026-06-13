@@ -18,12 +18,10 @@ changes and stays quiet when nothing needs to.
 ```
 taproot/
 ├── dotfiles/                       the soil — bash, git, neovim, tmux
-│   └── host/                       host-side configs (Zed, Windows ssh-config)
 ├── containers/
 │   └── webdev/
 │       ├── Dockerfile              the vessel — Ubuntu 24.04 dev image
 │       ├── bootstrap.ps1           one-shot host setup (Windows)
-│       ├── entrypoint.sh           starts sshd, then exec's CMD
 │       └── scripts/                copied to ~/scripts/ in the container
 │           ├── restic-backup.sh        manual restic snapshot to B2
 │           ├── restic-restore.sh       pull latest snapshot from B2
@@ -88,7 +86,6 @@ Then connect:
 
 ```sh
 docker exec -it bythewood-webdev tmux       # TUI workflow
-ssh -p 2222 dev@localhost                   # editor remote-dev (Zed, VS Code, JetBrains)
 ```
 
 ### Helper scripts inside the container
@@ -106,14 +103,8 @@ All in `~/scripts/` and on `PATH`:
 ## The dotfiles
 
 Minimal by intention. I respect defaults and only override what earns it.
-Two flavors:
-
-- **`dotfiles/`** baked into the container at build time via COPY (bash, git,
-  tmux, neovim).
-- **`dotfiles/host/`** copied by hand on a fresh Windows machine. Bootstrap
-  doesn't manage these to avoid trampling other entries you have:
-  - `dotfiles/host/zed-settings.json` -> `%APPDATA%\Zed\settings.json`
-  - `dotfiles/host/ssh-config` -> `~\.ssh\config` (merge with existing entries)
+Everything in **`dotfiles/`** is baked into the container at build time via
+COPY (bash, git, tmux, neovim).
 
 ## The host
 
