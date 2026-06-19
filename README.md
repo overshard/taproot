@@ -7,7 +7,7 @@ Dotfiles, containers, and the configs that make a machine mine.
 ## What is this?
 
 The single deep root beneath everything I work on. Personal infrastructure
-across every machine I tend — from the development container I write code in
+across every machine I tend, from the development container I write code in
 to the Alpine host that runs in the distance.
 
 This is not a framework. It's a living configuration. It grows when something
@@ -17,10 +17,10 @@ changes and stays quiet when nothing needs to.
 
 ```
 taproot/
-├── dotfiles/                       the soil — bash, git, neovim, tmux
+├── dotfiles/                       the soil: bash, git, neovim, tmux
 ├── containers/
 │   └── webdev/
-│       ├── Dockerfile              the vessel — Ubuntu 24.04 dev image
+│       ├── Dockerfile              the vessel: Ubuntu 24.04 dev image
 │       ├── bootstrap.ps1           one-shot host setup (Windows)
 │       └── scripts/                copied to ~/scripts/ in the container
 │           ├── restic-backup.sh        manual restic snapshot to B2
@@ -31,28 +31,33 @@ taproot/
 └── hosts/
     └── alpine/
         ├── quickstart.sh           provision a fresh server
-        ├── etc/caddy/              the single gate — Caddyfile
-        ├── etc/docker/             daemon configuration
-        ├── etc/periodic/           daily backups and upgrades
-        ├── root/                   health checks, restore.sh
+        ├── etc/apk/                package repositories
+        ├── etc/periodic/daily/     restic autobackup, apk autoupgrade
+        ├── root/                   health check, restore.sh
         └── srv/
-            ├── projects.conf       the manifest — every project, port, repo
+            ├── projects.conf       the manifest, every project and repo
+            ├── caddy/Caddyfile     the single gate, reverse proxy
             └── bootstrap.sh        clone all repos into a fresh code directory
 ```
 
 ## The projects it tends
 
-Everything deployed lives in `hosts/alpine/srv/projects.conf`. The Caddyfile,
-port map, and post-receive hooks all grow from that single file.
+Everything deployed lives in `hosts/alpine/srv/projects.conf`, one line per
+project: `name|github_repo|branch|has_data_dir|runs_migrations`. The Caddyfile,
+post-receive hooks, and bootstrap script all grow from that single file. Every
+container listens on 8000 internally; Caddy reaches each one by container name on
+the shared `bythewood-edge` network, so there is no per-project port to track.
 
-| Project | Port | What it is |
-|---|---|---|
-| [`analytics`](https://github.com/overshard/analytics) | 8000 | Self-hosted website analytics (Django, SQLite) |
-| [`blog.bythewood.me`](https://github.com/overshard/blog.bythewood.me) | 8100 | Personal blog (Flask, markdown files) |
-| [`timelite`](https://github.com/overshard/timelite) | 8200 | Local-only time tracker (Next.js, IndexedDB) |
-| [`isaacbythewood.com`](https://github.com/overshard/isaacbythewood.com) | 8300 | Personal portfolio (Next.js) |
-| [`status`](https://github.com/overshard/status) | 8400 | Uptime monitor & status page (Django, SQLite) |
-| [`darkfurrow.com`](https://github.com/overshard/darkfurrow.com) | 8500 | Seasonal almanac (Flask) |
+| Project | What it is |
+|---|---|
+| [`analytics`](https://github.com/overshard/analytics) | Self-hosted website analytics (Rust axum, SQLite) |
+| [`status`](https://github.com/overshard/status) | Uptime monitor & status page (Rust axum, SQLite) |
+| [`finance`](https://github.com/overshard/finance) | Self-hosted market watcher (Rust axum, SQLite) |
+| [`blog.bythewood.me`](https://github.com/overshard/blog.bythewood.me) | Personal blog (Rust axum, markdown files) |
+| [`darkfurrow.com`](https://github.com/overshard/darkfurrow.com) | Seasonal almanac (Rust axum) |
+| [`repos`](https://github.com/overshard/repos) | Minimal git repo browser (Rust axum) |
+| [`isaacbythewood.com`](https://github.com/overshard/isaacbythewood.com) | Personal portfolio (Next.js) |
+| [`timelite`](https://github.com/overshard/timelite) | Local-only time tracker (Next.js) |
 
 ## The container
 
@@ -109,8 +114,9 @@ COPY (bash, git, tmux, neovim).
 ## The host
 
 Alpine Linux. Firewall, daily restic backups to Backblaze B2, and quiet daily
-maintenance. The Caddyfile, port assignments, and post-receive hooks are all
-generated from `projects.conf` so the server can be rebuilt from this repo alone.
+maintenance. The bare repos and post-receive hooks are generated from
+`projects.conf` (the Caddyfile is hand-maintained) so the server can be rebuilt
+from this repo alone.
 
 Provision a fresh server:
 
