@@ -1,0 +1,21 @@
+{
+  "env": {
+    "TZ": "America/New_York"
+  },
+  "permissions": {
+    "defaultMode": "auto"
+  },
+  "worktree": {
+    "bgIsolation": "none"
+  },
+  "statusLine": {
+    "type": "command",
+    "command": "bash ~/.claude/status-line.sh"
+  },
+  "effortLevel": "high",
+  "skipDangerousModePermissionPrompt": true,
+  "verbose": true,
+  "remoteControlAtStartup": false,
+  "agentPushNotifEnabled": false,
+  "tui": "fullscreen"
+}

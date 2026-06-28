@@ -60,12 +60,14 @@ RUN apt-get update && \
         python3 python3-pip python3-venv \
         # Docker (buildx enables BuildKit cache mounts in Dockerfiles)
         docker.io docker-compose-v2 docker-buildx \
-        # Node (only used for `npx playwright install` below; bun is the JS runtime)
+        # Node (used for `npx playwright install` and the global @playwright/cli
+        # below; bun is the JS runtime for app code)
         nodejs npm && \
     curl -fsSL https://astral.sh/uv/install.sh | env UV_INSTALL_DIR=/usr/local/bin sh && \
     curl -fsSL https://bun.sh/install | env BUN_INSTALL=/usr/local bash
 
-# Playwright Chromium for the Claude playwright MCP. The MCP looks for stable
+# Playwright Chromium for the `playwright` skill, which drives the browser via
+# @playwright/cli (installed below) rather than an MCP. Some tools look for stable
 # Chrome at /opt/google/chrome/chrome, so symlink the playwright build there.
 # The chromium-* glob absorbs future playwright revision bumps.
 ENV PLAYWRIGHT_BROWSERS_PATH=/opt/playwright-browsers
@@ -74,6 +76,12 @@ RUN npx --yes playwright@latest install --with-deps chromium && \
     mkdir -p /opt/google/chrome && \
     ln -snf /opt/playwright-browsers/chromium-*/chrome-linux64/chrome /opt/google/chrome/chrome && \
     test -x /opt/google/chrome/chrome
+
+# @playwright/cli: token-efficient command-line browser automation. The
+# `playwright` skill (~/.claude/skills/playwright) uses this instead of the
+# Playwright MCP; it writes page state to disk so only what's needed enters
+# context (~4x fewer tokens than the MCP on a typical task).
+RUN npm install -g @playwright/cli && command -v playwright-cli
 
 RUN ln -snf /usr/share/zoneinfo/UTC /etc/localtime && echo "UTC" > /etc/timezone
 
@@ -124,14 +132,15 @@ RUN for f in /home/dev/scripts/*.sh; do mv "$f" "${f%.sh}"; done && \
 WORKDIR /home/dev
 USER dev
 
-# Rust toolchain via rustup (cargo for blog.bythewood.me, darkfurrow.com,
-# analytics axum binaries; rust-analyzer for the Claude Code LSP plugin).
-# --profile minimal skips offline rust-docs; components add the LSP, linter,
-# and formatter.
+# Rust toolchain via rustup (cargo for the axum apps: analytics, status, finance,
+# blog.bythewood.me, darkfurrow.com, repos). --profile minimal skips offline
+# rust-docs; components add the linter and formatter. No rust-analyzer: Rust work
+# goes through the `rust` skill, not an LSP plugin (the rust-analyzer-lsp plugin
+# was removed), and neovim here isn't configured for LSP.
 RUN curl --proto '=https' --tlsv1.2 -fsSL https://sh.rustup.rs | \
     sh -s -- -y --no-modify-path --profile minimal \
         --default-toolchain stable \
-        --component rust-analyzer,clippy,rustfmt
+        --component clippy,rustfmt
 
 RUN curl -fsSL https://claude.ai/install.sh | bash
 

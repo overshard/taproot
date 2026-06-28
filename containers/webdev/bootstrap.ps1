@@ -40,7 +40,8 @@
 
 .PARAMETER Only
     Run only the named step. One of: prereqs, volumes, taproot, image,
-    container, ssh, restic-password, b2-env, alpine-password, restore.
+    container, claude-links, ssh, restic-password, b2-env, alpine-password,
+    restore.
 
 .PARAMETER Restore
     After all setup steps, run ~/scripts/restic-restore inside the container
@@ -65,7 +66,7 @@ param(
     [string]$HostTag,
 
     [ValidateSet(
-        "prereqs", "volumes", "taproot", "image", "container",
+        "prereqs", "volumes", "taproot", "image", "container", "claude-links",
         "ssh", "restic-password", "b2-env", "alpine-password", "restore"
     )]
     [string]$Only,
@@ -290,6 +291,22 @@ function Step-Container {
 }
 
 # ---------------------------------------------------------------------------
+# Wire the version-controlled Claude Code config (skills + status line) from
+# taproot into the ~/.claude volume. These can't be baked into the image:
+# /home/dev/.claude is a runtime volume mount that shadows anything the image
+# puts there, so we symlink after the volume is mounted. Idempotent (ln -snf).
+# The live settings.json stays machine-local (it carries permission-posture
+# flags and is not symlinked); see dotfiles/claude/README.md.
+function Step-ClaudeLinks {
+    Step-Banner "claude-links"
+    $link = 'ln -snf /home/dev/code/taproot/dotfiles/claude/skills /home/dev/.claude/skills && ' +
+            'ln -snf /home/dev/code/taproot/dotfiles/claude/status-line.sh /home/dev/.claude/status-line.sh'
+    docker exec $ContainerName sh -c $link | Out-Null
+    if ($LASTEXITCODE -ne 0) { Fail "failed to wire ~/.claude symlinks from taproot" }
+    Done "linked ~/.claude/{skills,status-line.sh} -> taproot dotfiles"
+}
+
+# ---------------------------------------------------------------------------
 function Step-Ssh {
     Step-Banner "ssh"
     docker exec $ContainerName test -f /home/dev/.ssh/home_key 2>$null
@@ -422,6 +439,7 @@ if (Should-Run "volumes")          { Step-Volumes }
 if (Should-Run "taproot")          { Step-Taproot }
 if (Should-Run "image")            { Step-Image }
 if (Should-Run "container")        { Step-Container }
+if (Should-Run "claude-links")     { Step-ClaudeLinks }
 if (Should-Run "ssh")              { Step-Ssh }
 if (Should-Run "restic-password")  { Step-ResticPassword }
 if (Should-Run "b2-env")           { Step-B2Env }
