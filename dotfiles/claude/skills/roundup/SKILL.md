@@ -1,6 +1,6 @@
 ---
 name: roundup
-description: Fast, spin-stripped news + markets briefing for Isaac, delivered as a diff since the last roundup. Invoke when Isaac says "roundup", asks "what's new / what did I miss", or wants a quick news/markets catch-up. Fans out across the political spectrum (NPR/BBC/CNN/Fox/Google News/AP/Reuters), market data (indexes/crypto/commodities), local NC, work-talk sports (NASCAR/F1/soccer), and watercooler feeds (Hacker News/Reddit); filters hard to only what matters; reads the previous roundup from code/memory/roundups/ to report only what changed, then saves and commits the new one.
+description: Fast, spin-stripped news + markets briefing for Isaac, delivered as a diff since the last roundup. Invoke when Isaac says "roundup", asks "what's new / what did I miss", or wants a quick news/markets catch-up. Fans out across the political spectrum (NPR/BBC/CNN/Fox/Google News/AP/Reuters), market data (indexes/crypto/commodities), local NC, work-talk sports (NASCAR/F1/soccer), PC gaming (big releases + hyped indies), and watercooler feeds (Hacker News); filters hard to only what matters; reads the previous roundup from code/memory/roundups/ to report only what changed, then saves and commits the new one.
 ---
 
 # Roundup: spin-stripped news + markets, as a diff
@@ -80,12 +80,16 @@ News RSS if one is down):
    - WebSearch "Elkin NC news", "Yadkin Valley news", "North Carolina news today". Weather only if severe (Isaac has had storm power outages).
 4. **Sports for work talk** (NASCAR, F1, soccer/World Cup ONLY)
    - ESPN F1: `https://www.espn.com/espn/rss/rpm/news`, ESPN soccer: `https://www.espn.com/espn/rss/soccer/news`; NASCAR via WebSearch "NASCAR Cup last race result next race". Latest result + next event + any standings shift, one line each.
-5. **Watercooler** (Hacker News + Reddit, only genuinely notable)
-   - Hacker News front page: `https://hnrss.org/frontpage` (or `https://hacker-news.firebaseio.com/v0/topstories.json`).
-   - Reddit: `https://www.reddit.com/r/news/top.json?t=day&limit=15`, `.../r/worldnews/top.json?t=day` (set a UA; if blocked, `.rss` variant or skip). Surface only items with real signal (a major outage, a tech/industry shift, a story the mainstream feeds missed), not memes.
+5. **Gaming** (PC gaming, big releases/announcements, hyped indies; Isaac plays PC and tracks what's new and hyped)
+   - PC Gamer: `https://www.pcgamer.com/rss/`, Rock Paper Shotgun: `https://www.rockpapershotgun.com/feed`, Eurogamer: `https://www.eurogamer.net/feed`, IGN games: `https://feeds.feedburner.com/ign/games-all`.
+   - Steam: `https://store.steampowered.com/feeds/news.xml`; WebSearch "Steam top sellers this week" and "most wishlisted Steam games" for what's actually hyped right now.
+   - KEEP: notable new releases and firm release dates, major studio/industry news (acquisitions, engine/platform shifts, big game-changing patches), and genuinely hyped indie games (strong wishlist/early-access buzz, breakout launches). DROP: console-exclusive minutiae Isaac can't play on PC, mobile/gacha, esports match scores, routine patch notes, and review-score churn. A few bullets max, one neutral line each + (sources).
+6. **Watercooler** (Hacker News only, genuinely notable items)
+   - Hacker News front page: `https://hnrss.org/frontpage` (or `https://hacker-news.firebaseio.com/v0/topstories.json`). Surface only items with real signal (a major outage, a tech/industry shift, a story the mainstream feeds missed), not memes.
+   - Reddit is intentionally NOT used. Tested 2026-06-27: Reddit blocks this container's datacenter IP at the network level (403/429 + "blocked by network security") on the JSON API, the `.rss` feed, old.reddit, and a full headless Chromium with a spoofed browser UA. The block is IP-based, so neither a user-agent nor a real browser bypasses it. The only working path would be the authenticated OAuth API (client_id/secret), which we have not set up. Do not waste a fetch attempt on Reddit; r/news and r/worldnews largely duplicate the mainstream feeds anyway.
 
 Scale the fan-out to the ask: a quick "what'd I miss" can be 3 agents (news+politics,
-markets, sports); a fuller catch-up after days away uses all five. Drop a cluster Isaac
+markets, sports); a fuller catch-up after days away uses all six. Drop a cluster Isaac
 says he does not want.
 
 ### Step 2 — merge and diff
@@ -122,7 +126,10 @@ BTC  $61.2k  ▼2.1%   ETH  $3.3k  ▼1.4%   Gold  $2,3xx  ▲0.4%   WTI  $79  �
 - NASCAR: ... (ESPN)
 - Soccer: ... World Cup if live. (BBC Sport)
 
-## Watercooler (HN / Reddit)
+## Gaming
+- [NEW] big release / studio news / hyped indie, one line. (PC Gamer, RPS)
+
+## Watercooler (HN)
 - ... (Hacker News)
 ```
 
