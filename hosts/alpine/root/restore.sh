@@ -28,6 +28,18 @@ done
 export RESTIC_REPOSITORY="b2:overshard-backups:alpine"
 export RESTIC_PASSWORD_FILE="/root/.restic/password"
 
+if [ -z "${RESTIC_HOST:-}" ]; then
+    echo "ERROR: RESTIC_HOST is not set in /root/.restic/b2-env" >&2
+    exit 1
+fi
+
+# Preflight before touching anything: a bad credential or unreachable repo
+# must fail here, not after docker is stopped and /srv is moved aside.
+if ! restic cat config >/dev/null; then
+    echo "ERROR: cannot open restic repository $RESTIC_REPOSITORY" >&2
+    exit 1
+fi
+
 ARCHIVE="/root/before-restore-$(date -u +%Y-%m-%dT%H-%M-%SZ)"
 
 echo "Stopping docker..."
@@ -41,7 +53,7 @@ fi
 mkdir -p /srv
 
 echo "Restoring latest snapshot from $RESTIC_REPOSITORY"
-restic restore latest --target /
+restic restore latest --host="$RESTIC_HOST" --target /
 
 echo "Starting docker..."
 rc-service docker start

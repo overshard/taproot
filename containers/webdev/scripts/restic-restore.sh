@@ -16,6 +16,18 @@ set -eu
 export RESTIC_REPOSITORY="b2:overshard-backups:webdev"
 export RESTIC_PASSWORD_FILE="$HOME/.restic/password"
 
+if [ -z "${RESTIC_HOST:-}" ]; then
+    echo "ERROR: RESTIC_HOST is not set in ~/.restic/b2-env" >&2
+    exit 1
+fi
+
+# Preflight before moving anything aside: a bad credential or unreachable
+# repo must fail here, not after the working data has been archived.
+if ! restic cat config >/dev/null; then
+    echo "ERROR: cannot open restic repository $RESTIC_REPOSITORY" >&2
+    exit 1
+fi
+
 ARCHIVE="$HOME/before-restore-$(date -u +%Y-%m-%dT%H-%M-%SZ)"
 
 echo "Moving existing data aside to $ARCHIVE"
@@ -29,7 +41,9 @@ for dir in .claude code .ssh; do
 done
 
 echo "Restoring latest snapshot from $RESTIC_REPOSITORY"
-restic restore latest --target /
+# --host: desktop and laptop share this repo; a bare `latest` would restore
+# whichever machine backed up most recently.
+restic restore latest --host="$RESTIC_HOST" --target /
 
 echo ""
 echo "Restore complete. Previous data archived at:"

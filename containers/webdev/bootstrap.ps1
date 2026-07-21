@@ -75,7 +75,7 @@ param(
     [switch]$Force,
 
     [string]$TaprootRepo = "git@github.com:overshard/taproot.git",
-    [string]$TaprootBranch = "master"
+    [string]$TaprootBranch = "main"
 )
 
 $ErrorActionPreference = "Stop"

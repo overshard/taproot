@@ -37,6 +37,10 @@ if ! restic cat config >/dev/null 2>&1; then
     restic init
 fi
 
+# Capture exit codes instead of letting set -e kill the script: a partial
+# backup (restic exit 3, some files unreadable) still produced a snapshot,
+# and the retention prune must still run after it.
+backup_exit=0
 restic backup \
     --verbose \
     --host="$RESTIC_HOST" \
@@ -52,10 +56,16 @@ restic backup \
     --exclude='*.pyc' \
     "$HOME/.claude" \
     "$HOME/code" \
-    "$HOME/.ssh"
+    "$HOME/.ssh" || backup_exit=$?
 
+prune_exit=0
 restic forget --prune \
     --host="$RESTIC_HOST" \
     --keep-daily   7 \
     --keep-weekly  4 \
-    --keep-monthly 6
+    --keep-monthly 6 || prune_exit=$?
+
+if [ "$backup_exit" -ne 0 ] || [ "$prune_exit" -ne 0 ]; then
+    echo "backup exit ${backup_exit}, prune exit ${prune_exit}" >&2
+    exit "$(( backup_exit > prune_exit ? backup_exit : prune_exit ))"
+fi

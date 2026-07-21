@@ -23,6 +23,7 @@ services:
           - analytics.bythewood.me
           - blog.bythewood.me
           - finance.bythewood.me
+          - repos.bythewood.me
           - status.bythewood.me
           - timelite.bythewood.me
           - darkfurrow.com

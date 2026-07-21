@@ -11,6 +11,10 @@
 
 set -e
 
+# Run from this script's directory so the relative cp/read paths below work
+# no matter where it is invoked from.
+cd "$(dirname "$0")"
+
 # Install dependencies
 apk update
 apk upgrade
@@ -29,15 +33,15 @@ apk add \
 # Configure firewall
 ufw allow 22/tcp
 ufw allow 80/tcp
-ufw allow 80/udp   # http3
 ufw allow 443/tcp
-ufw allow 443/udp  # http3
+ufw allow 443/udp  # http3 (QUIC negotiates on 443 only; there is no 80/udp)
 ufw --force enable
 
 # Install configuration files
 cp etc/apk/repositories /etc/apk/repositories && chmod 644 /etc/apk/repositories
 cp etc/periodic/daily/apk-autoupgrade /etc/periodic/daily/apk-autoupgrade && chmod 700 /etc/periodic/daily/apk-autoupgrade
 cp etc/periodic/daily/restic-autobackup /etc/periodic/daily/restic-autobackup && chmod 700 /etc/periodic/daily/restic-autobackup
+cp etc/crontabs/root /etc/crontabs/root && chmod 600 /etc/crontabs/root
 cp root/server-health-check.sh /root/server-health-check.sh && chmod 700 /root/server-health-check.sh
 cp root/restore.sh /root/restore.sh && chmod 700 /root/restore.sh
 
@@ -48,7 +52,8 @@ mkdir -p /root/.restic && chmod 700 /root/.restic
 echo ""
 echo "** Place restic credentials before backups will run: **"
 echo "   /root/.restic/password   restic repo password (chmod 600)"
-echo "   /root/.restic/b2-env     exports B2_ACCOUNT_ID and B2_ACCOUNT_KEY (chmod 600)"
+echo "   /root/.restic/b2-env     exports B2_ACCOUNT_ID, B2_ACCOUNT_KEY, and"
+echo "                            RESTIC_HOST=alpinelinux (chmod 600)"
 echo ""
 
 # Provision each project from projects.conf
@@ -85,13 +90,20 @@ while IFS='|' read -r name repo branch has_data has_migrate; do
     # Post-receive hook
     cat > "/srv/git/${name}.git/hooks/post-receive" << HOOK
 #!/bin/sh
+# Abort the deploy on the first failure rather than building/starting a
+# container from whatever state the working clone happened to be in.
+set -e
 
 while read oldrev newrev ref; do
   if [ "\$ref" = "refs/heads/${branch}" ]; then
     unset GIT_DIR
     START_TIME=\$(date +%s)
     cd /srv/docker/${name}
-    git pull
+    # Pull from the local bare repo the push just updated, not GitHub: the
+    # deploy must reflect exactly what was pushed and must not depend on
+    # GitHub being reachable or in sync.
+    git fetch "/srv/git/${name}.git" "${branch}"
+    git merge --ff-only FETCH_HEAD
     docker compose up --build --detach
     # Reattach every container in the project to the shared edge network.
     # Resolved via \`compose ps\` (not \`${name}\`) so this works regardless
@@ -123,6 +135,9 @@ done < srv/projects.conf
 # Start services and add to startup
 rc-update add ufw boot && rc-service ufw start
 rc-update add docker boot && rc-service docker start
+# crond drives /etc/periodic (apk upgrades, restic backups); without it the
+# scripts installed above never run.
+rc-update add crond boot && rc-service crond start
 
 # Shared edge network: Caddy and every project's web container attach here so
 # Caddy can reverse_proxy by container name. Created idempotently; the
