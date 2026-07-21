@@ -5,7 +5,9 @@
 # (7 daily, 4 weekly, 6 monthly) after each successful backup.
 #
 # Snapshots are tagged with --host=$RESTIC_HOST for parity with the
-# webdev backups. Set RESTIC_HOST in /root/.restic/b2-env (e.g. "alpine").
+# webdev backups. Set RESTIC_HOST in /root/.restic/b2-env; the live server
+# uses "alpinelinux" (per-host retention diverges if a re-provision picks a
+# different name).
 #
 # Credentials:
 #   /root/.restic/password   restic repo password (0600 root)
@@ -20,7 +22,7 @@ info() { printf "\n%s %s\n\n" "$(date)" "$*" >&2; }
 trap 'echo $(date) Backup interrupted >&2; exit 2' INT TERM
 
 if [ -z "${RESTIC_HOST:-}" ]; then
-    info "ERROR: RESTIC_HOST is not set. Add 'export RESTIC_HOST=alpine' to /root/.restic/b2-env"
+    info "ERROR: RESTIC_HOST is not set. Add 'export RESTIC_HOST=alpinelinux' to /root/.restic/b2-env"
     exit 1
 fi
 
