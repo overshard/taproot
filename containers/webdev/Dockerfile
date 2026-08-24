@@ -1,6 +1,6 @@
 # webdev
 #
-# Ubuntu 24.04 dev container with tmux, neovim, claude code, Bun, uv, cargo,
+# Ubuntu 24.04 dev container with tmux, neovim, claude code, Bun, uv, cargo, Go,
 # Docker CLI, and Playwright Chromium. Used as a portable development environment
 # across desktop and laptop, with restic backups to Backblaze B2.
 #
@@ -46,7 +46,7 @@ ENV DEBIAN_FRONTEND=noninteractive \
     LANG=C.UTF-8 \
     LC_ALL=C.UTF-8 \
     TERM=xterm-256color \
-    PATH="/home/dev/.local/bin:/home/dev/.cargo/bin:$PATH"
+    PATH="/home/dev/.local/bin:/home/dev/.cargo/bin:/usr/local/go/bin:/home/dev/go/bin:$PATH"
 
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
@@ -128,6 +128,18 @@ COPY containers/webdev/scripts/ /home/dev/scripts/
 RUN for f in /home/dev/scripts/*.sh; do mv "$f" "${f%.sh}"; done && \
     chmod +x /home/dev/scripts/* && \
     chown -R dev:dev /home/dev/scripts
+
+# Go toolchain, installed from upstream tarball rather than apt because
+# Ubuntu 24.04 ships a version several releases behind. This is what the
+# workspace is moving to: see memory decisions/0008. The checksum is pinned so
+# a tampered or truncated download fails loudly instead of producing a
+# half-working toolchain.
+ARG GO_VERSION=1.27.0
+ARG GO_SHA256=675c26c449cbb18fc24b74650de1eabbae6e16f64326fd85a283fb3b58280685
+RUN curl -fsSLO "https://go.dev/dl/go${GO_VERSION}.linux-amd64.tar.gz" && \
+    echo "${GO_SHA256}  go${GO_VERSION}.linux-amd64.tar.gz" | sha256sum -c - && \
+    tar -C /usr/local -xzf "go${GO_VERSION}.linux-amd64.tar.gz" && \
+    rm "go${GO_VERSION}.linux-amd64.tar.gz"
 
 WORKDIR /home/dev
 USER dev
