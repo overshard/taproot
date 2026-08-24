@@ -1,0 +1,42 @@
+name: tunnel-test
+
+# No bind mounts anywhere. The Caddyfile is baked into its image, and
+# cloudflared's state (cert.pem, credentials.json, config.yml) lives in a named
+# volume seeded by setup-tunnel.sh. That keeps the stack runnable from inside
+# the webdev container, whose filesystem the host daemon cannot see, and it is
+# the direction decisions/0007 takes anyway.
+
+services:
+  hello:
+    build: ./hello
+    container_name: tunnel-test-hello
+    restart: unless-stopped
+    networks: [tunnel-test]
+
+  caddy:
+    build: ./caddy
+    container_name: tunnel-test-caddy
+    restart: unless-stopped
+    networks: [tunnel-test]
+    depends_on: [hello]
+
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    container_name: tunnel-test-cloudflared
+    restart: unless-stopped
+    command: tunnel --config /etc/cloudflared/config.yml run
+    volumes:
+      - cloudflared:/etc/cloudflared:ro
+    networks: [tunnel-test]
+    depends_on: [caddy]
+
+networks:
+  tunnel-test:
+    name: tunnel-test
+
+volumes:
+  # Created and populated by setup-tunnel.sh before the stack ever runs, so it
+  # is external here rather than something compose owns.
+  cloudflared:
+    name: tunnel-test-cloudflared
+    external: true
