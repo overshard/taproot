@@ -144,8 +144,9 @@ RUN curl -fsSLO "https://go.dev/dl/go${GO_VERSION}.linux-amd64.tar.gz" && \
 WORKDIR /home/dev
 USER dev
 
-# Rust toolchain via rustup (cargo for the axum apps: analytics, status, finance,
-# blog.bythewood.me, darkfurrow.com, repos). --profile minimal skips offline
+# Rust toolchain via rustup (cargo for the axum apps: blog.bythewood.me plus the
+# archived analytics-rust, status-rust, finance-rust, repos-rust and
+# darkfurrow.com). --profile minimal skips offline
 # rust-docs; components add the linter and formatter. No rust-analyzer: Rust work
 # goes through the `rust` skill, not an LSP plugin (the rust-analyzer-lsp plugin
 # was removed), and neovim here isn't configured for LSP.

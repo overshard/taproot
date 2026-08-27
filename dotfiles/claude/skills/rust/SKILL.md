@@ -1,13 +1,16 @@
 ---
 name: rust
-description: Work on the Rust axum projects in this workspace (analytics, status, finance, blog.bythewood.me, darkfurrow.com, repos). Invoke when building, running, editing, or debugging any of these single-binary axum + Vite + SQLite apps. Covers the shared architecture, dev commands, and the gotchas that bite (Jinja URL escaping, embedded Typst PDF, the Vite manifest). Always read the project's own note in code/memory/projects/<name>.md first for project-specific detail.
+description: Work on the Rust axum projects in this workspace (blog.bythewood.me, plus the archived analytics-rust, status-rust, finance-rust, repos-rust and darkfurrow.com). Invoke when building, running, editing, or debugging any of these single-binary axum + Vite + SQLite apps. Covers the shared architecture, dev commands, and the gotchas that bite (Jinja URL escaping, embedded Typst PDF, the Vite manifest). Always read the project's own note in code/memory/projects/<name>.md first for project-specific detail.
 ---
 
 # Rust axum projects
 
 Six apps share one architecture: a single axum binary with a Vite-built frontend and an
-embedded SQLite database. **Before editing one, read its living note**
-`~/code/memory/projects/<name>.md` (analytics, status, finance, blog, darkfurrow, repos):
+embedded SQLite database. Only `blog.bythewood.me` is still active; `analytics-rust`,
+`status-rust`, `finance-rust`, `repos-rust` and `darkfurrow.com` were archived on 2026-08-26
+and their local checkouts have no git remotes. **Before editing one, read its living note**
+`~/code/memory/projects/<name>.md` (analytics-rust, status-rust, finance-rust, blog,
+darkfurrow, repos-rust):
 that note is the authoritative per-project guidance (env vars, deploy, quirks) that used
 to live in a per-project CLAUDE.md.
 

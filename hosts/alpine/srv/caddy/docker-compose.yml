@@ -26,8 +26,6 @@ services:
           - repos.bythewood.me
           - status.bythewood.me
           - timelite.bythewood.me
-          - darkfurrow.com
-          - www.darkfurrow.com
           - isaacbythewood.com
           - www.isaacbythewood.com
           - bythewood.me
