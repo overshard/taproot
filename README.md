@@ -50,8 +50,8 @@ the shared `bythewood-edge` network, so there is no per-project port to track.
 
 | Project | What it is |
 |---|---|
-| [`analytics`](https://github.com/overshard/analytics) | Self-hosted website analytics (Rust axum, SQLite) |
-| [`status`](https://github.com/overshard/status) | Uptime monitor & status page (Rust axum, SQLite) |
+| [`analytics-rust`](https://github.com/overshard/analytics-rust) | Self-hosted website analytics (Rust axum, SQLite), archived; deployed today |
+| [`status-rust`](https://github.com/overshard/status-rust) | Uptime monitor & status page (Rust axum, SQLite), archived; deployed today |
 | [`finance-rust`](https://github.com/overshard/finance-rust) | Self-hosted market watcher (Rust axum, SQLite) |
 | [`blog.bythewood.me`](https://github.com/overshard/blog.bythewood.me) | Personal blog (Rust axum, markdown files) |
 | [`darkfurrow.com`](https://github.com/overshard/darkfurrow.com) | Seasonal almanac (Rust axum) |
