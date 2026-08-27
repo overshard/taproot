@@ -88,15 +88,7 @@ timelite.app, www.timelite.app {
 # Dark Furrow
 #
 
-darkfurrow.com {
-  reverse_proxy darkfurrow:8000
 
-  import common
-}
-
-www.darkfurrow.com {
-  redir https://darkfurrow.com permanent
-}
 
 
 #
