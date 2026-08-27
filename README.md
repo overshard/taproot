@@ -52,10 +52,10 @@ the shared `bythewood-edge` network, so there is no per-project port to track.
 |---|---|
 | [`analytics`](https://github.com/overshard/analytics) | Self-hosted website analytics (Rust axum, SQLite) |
 | [`status`](https://github.com/overshard/status) | Uptime monitor & status page (Rust axum, SQLite) |
-| [`finance`](https://github.com/overshard/finance) | Self-hosted market watcher (Rust axum, SQLite) |
+| [`finance-rust`](https://github.com/overshard/finance-rust) | Self-hosted market watcher (Rust axum, SQLite) |
 | [`blog.bythewood.me`](https://github.com/overshard/blog.bythewood.me) | Personal blog (Rust axum, markdown files) |
 | [`darkfurrow.com`](https://github.com/overshard/darkfurrow.com) | Seasonal almanac (Rust axum) |
-| [`repos`](https://github.com/overshard/repos) | Minimal git repo browser (Rust axum) |
+| [`repos-rust`](https://github.com/overshard/repos-rust) | Minimal git repo browser (Rust axum) |
 | [`isaacbythewood.com`](https://github.com/overshard/isaacbythewood.com) | Personal portfolio (Next.js) |
 | [`timelite`](https://github.com/overshard/timelite) | Local-only time tracker (Next.js) |
 
