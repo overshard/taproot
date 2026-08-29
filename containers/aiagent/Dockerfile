@@ -104,9 +104,12 @@ RUN useradd -m -u 1001 -s /bin/bash ai && \
 
 COPY dotfiles/bash_aliases /home/ai/.bash_aliases
 COPY dotfiles/tmux.conf /home/ai/.tmux.conf
+# pi walks up from its cwd to find this. Measurably changes what the model
+# reaches for: without it a 9B picks a stale Vite major and a cgo sqlite driver.
+COPY dotfiles/agents.md /home/ai/AGENTS.md
 # extended-keys lets pi see modified Enter. Appended rather than added to the
 # shared dotfile so webdev's tmux is untouched.
-RUN chown ai:ai /home/ai/.bash_aliases /home/ai/.tmux.conf && \
+RUN chown ai:ai /home/ai/.bash_aliases /home/ai/.tmux.conf /home/ai/AGENTS.md && \
     echo "source ~/.bash_aliases" >> /home/ai/.bashrc && \
     printf 'set -g extended-keys on\nset -g extended-keys-format csi-u\n' >> /home/ai/.tmux.conf
 
