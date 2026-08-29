@@ -69,10 +69,22 @@ shell-aiagent:
 stop-aiagent:
 	$(DOCKER) stop bythewood-aiagent
 
-# The only step that reaches Hugging Face; weights land in the volume.
+# The only step that reaches Hugging Face; weights land in the volume. Starts
+# the server with offline disabled, waits for it to come up, then tears it
+# down. --list-devices does not work here: it exits before -hf is resolved.
 models:
-	$(DOCKER) run --rm --env LLAMA_ARG_OFFLINE=false \
-		--volume bythewood-ai-models:/models $(REGISTRY)/aiagent:latest --list-devices
+	-$(DOCKER) rm --force aiagent-fetch
+	$(DOCKER) run --detach --name aiagent-fetch --gpus all \
+		--env LLAMA_ARG_OFFLINE=false \
+		--volume bythewood-ai-models:/models $(REGISTRY)/aiagent:latest
+	@echo "downloading weights, several GB, this takes a while"
+	@while ! $(DOCKER) exec aiagent-fetch curl -sf -o /dev/null http://127.0.0.1:8000/health 2>/dev/null; do \
+		$(DOCKER) ps -q -f name=aiagent-fetch | grep -q . || \
+			{ echo "fetch failed:"; $(DOCKER) logs --tail 20 aiagent-fetch; exit 1; }; \
+		sleep 10; \
+	done
+	@$(DOCKER) rm --force aiagent-fetch >/dev/null
+	@echo "weights are in the bythewood-ai-models volume"
 
 # /home/dev/.claude is a volume and shadows whatever the image puts there, so
 # these have to be linked into the running container. Safe to re-run.
