@@ -11,8 +11,7 @@
 # Build or rebuild (~15 min the first time):
 #     docker build --tag overshard/aiagent:latest -f containers/aiagent/Dockerfile .
 #
-# Fetch the weights once, the only step that reaches Hugging Face. Runs the
-# server with offline disabled until it is healthy, then stops it:
+# Fetch the weights once, the only step that reaches Hugging Face:
 #     make models
 #
 # Replace a running container with the new image:
@@ -120,10 +119,47 @@ RUN useradd -m -u 1001 -s /bin/bash ai && \
 COPY dotfiles/bash_aliases /home/ai/.bash_aliases
 COPY dotfiles/tmux.conf /home/ai/.tmux.conf
 # pi walks up from its cwd to find this.
-COPY dotfiles/agents.md /home/ai/AGENTS.md
+COPY --chown=ai:ai <<'AGENTS' /home/ai/AGENTS.md
+# AGENTS.md
+
+## Tools
+
+You have `read`, `bash`, `edit`, `write`, and web tools: `web_search`,
+`fetch_content` and `get_search_content`. Use them. Do not answer from memory
+when a fact can be looked up.
+
+## Before adding any dependency
+
+Look up the current stable version before writing it into a manifest. Training
+data is out of date and will suggest an old major version.
+
+1. `web_search` for the package's latest stable release.
+2. Write the version you found, not one you remember.
+3. Say in your summary which version you found.
+
+## Go
+
+- Final images are minimal and have no C compiler. Any SQLite driver must be
+  pure Go and must build with `CGO_ENABLED=0`. `modernc.org/sqlite` works;
+  `mattn/go-sqlite3` needs cgo and fails at runtime.
+- `embed` patterns cannot reach outside the package directory and do not
+  support `**`.
+
+## Frontend
+
+Bun and Vite, no npm and no nodejs. Build the frontend before claiming it
+works: `bun install && bun run build`. Vite emits a manifest so the server can
+resolve content hashed filenames.
+
+## Definition of done
+
+`go build ./...` and `go vet ./...` both exit zero, and the frontend builds.
+Run them. Do not report success without running them. A program that compiles
+but serves a blank page is not done.
+AGENTS
 # extended-keys lets pi see modified Enter. Appended rather than added to the
 # shared dotfile so webdev's tmux is untouched.
-RUN chown ai:ai /home/ai/.bash_aliases /home/ai/.tmux.conf /home/ai/AGENTS.md && \
+RUN chown ai:ai /home/ai/.bash_aliases /home/ai/.tmux.conf && \
     echo "source ~/.bash_aliases" >> /home/ai/.bashrc && \
     printf 'set -g extended-keys on\nset -g extended-keys-format csi-u\n' >> /home/ai/.tmux.conf
 
@@ -151,8 +187,6 @@ ENV PI_OFFLINE=1 \
     NPM_CONFIG_FUND=false \
     NPM_CONFIG_AUDIT=false
 
-# Binds loopback and publishes nothing, so only pi in this container can reach
-# it and it needs no API key.
 #   --no-mmproj   refuse the vision projector, which costs VRAM and makes the
 #                 server disable prompt caching
 #   --parallel 1  hybrid attention corrupts context checkpoints under

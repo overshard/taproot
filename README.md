@@ -18,7 +18,7 @@ changes and stays quiet when nothing needs to.
 ```
 taproot/
 ├── Makefile                        build, swap, and link everything below
-├── dotfiles/                       the soil: bash, git, neovim, tmux, claude, agents.md
+├── dotfiles/                       the soil: bash, git, neovim, tmux, claude
 └── containers/
     ├── webdev/
     │   ├── Dockerfile              the vessel: Debian 13 dev image
@@ -61,6 +61,20 @@ in a comment. `make` on its own lists them.
 The docker socket is root-owned, so `DOCKER` defaults to `sudo docker`. On a
 host where docker needs no sudo, override it: `make build DOCKER=docker`.
 
+## The two containers
+
+Both are Debian 13, both run as UID 1001, and both mount `bythewood-code`, so
+they see the same `~/code`. That is the only thing they share. One is built to
+write code, the other to run a model.
+
+| | `webdev` | `aiagent` |
+|---|---|---|
+| For | writing and building | running a local coding agent |
+| Toolchains | Go, uv, Bun, typst, Docker CLI, Playwright | none, by design |
+| GPU | no | `--gpus all`, required |
+| Publishes | 8000, for dev servers | nothing |
+| Image | 3.5 GB | 2.2 GB |
+
 ## The webdev container
 
 A Debian 13 development workstation with everything already in the ground: Go,
@@ -87,36 +101,6 @@ docker stop bythewood-webdev
 docker start bythewood-webdev
 ```
 
-## The aiagent container
-
-A llama.cpp CUDA server holding a 9B coding model at 128k context, plus the
-[pi](https://pi.dev) coding agent pointed at it. Sized for an 8GB Ampere card.
-The server binds loopback and publishes nothing, so only pi inside the
-container can reach it and it needs no API key.
-
-```sh
-make aiagent
-make models          # once, the only time it reaches Hugging Face
-make swap-aiagent
-make shell-aiagent   # then type: pi
-make stop-aiagent    # frees the VRAM
-```
-
-It shares the `bythewood-code` volume with webdev, so both see the same
-`~/code`. That is why its user is also UID 1001.
-
-`dotfiles/agents.md` is baked in at `/home/ai/AGENTS.md`, where pi finds it by
-walking up from its working directory. It earns its place: measured against a
-9B model, its absence produced a stale Vite major and a cgo SQLite driver that
-compiles and then fails at runtime, and its presence fixed both.
-
-Serving a different model needs no rebuild, just llama-server flags appended
-to the run:
-
-```sh
-docker run --rm --gpus all --volume bythewood-ai-models:/models overshard/aiagent:latest -hf <repo>:<quant> --alias local
-```
-
 ### Things that are not obvious
 
 - `--init` is required. Without a real PID 1, tmux leaves zombies behind and
@@ -136,7 +120,7 @@ docker run --rm --gpus all --volume bythewood-ai-models:/models overshard/aiagen
   images carry a `profile.d` snippet for this; neither it nor the `ENV` alone
   is enough.
 
-### Helper scripts inside webdev
+### Helper scripts
 
 All in `~/scripts/` and on `PATH`:
 
@@ -146,6 +130,46 @@ All in `~/scripts/` and on `PATH`:
 | `restic-restore` | Pull latest snapshot from B2; existing data archived first |
 | `restic-status`  | Last snapshot per host across both restic repos, plus repo size |
 | `code-sync`      | `git fetch && git pull --ff-only` for every repo under `~/code/`, then clones any non-archived non-fork repos owned by overshard on GitHub that aren't local yet |
+
+## The aiagent container
+
+Qwen3.5-9B at 128k context on a llama.cpp CUDA server, plus the
+[pi](https://pi.dev) coding agent pointed at it. Sized for an 8GB Ampere card.
+The server binds loopback and publishes nothing, so only pi inside the
+container can reach it and it needs no API key.
+
+```sh
+make aiagent
+make models          # once, the only step that reaches Hugging Face
+make swap-aiagent
+make shell-aiagent   # then type: pi
+make stop-aiagent    # frees the VRAM
+```
+
+Serving a different model needs no rebuild, just llama-server flags appended
+to the run:
+
+```sh
+docker run --rm --gpus all --volume bythewood-ai-models:/models overshard/aiagent:latest -hf <repo>:<quant> --alias local
+```
+
+### Things that are not obvious
+
+- `--gpus all` or it loads nothing at all: without the driver injection
+  `llama-server` cannot find `libcuda.so.1` and exits before anything else.
+- Weights plus a 128k `q4_0` KV cache sit at about 96% of an 8 GB card, so a
+  second CUDA process will not fit beside it. `make stop-aiagent` frees it.
+- The `q4_0` KV cache flags are load bearing, not tuning. Qwen3.5 is a hybrid
+  attention model, so only 8 of its 32 layers hold a growing cache; at 128k
+  that is about 1.2 GB quantized against roughly 4.3 GB at f16.
+- **It has no Go, bun or node.** This container runs an agent, it does not
+  build, so the agent cannot compile what it writes. Build in `webdev`.
+- An `AGENTS.md` is written to `/home/ai/AGENTS.md` by the Dockerfile itself,
+  where pi finds it by walking up from its working directory. It earns its
+  place: measured against this 9B, its absence produced a stale Vite major and
+  a cgo SQLite driver that compiles and then fails at runtime; its presence
+  fixed both. It is inline rather than in `dotfiles/` because nothing else
+  uses it.
 
 ## A machine that has never run this before
 
@@ -181,6 +205,14 @@ and shadows whatever the image puts there:
 
 ```sh
 make dotfiles
+```
+
+On a machine with an NVIDIA card, pull the model weights and bring the agent
+up. Skip this on a machine without one; nothing else depends on it:
+
+```sh
+make models
+make swap-aiagent
 ```
 
 ## The dotfiles
