@@ -10,6 +10,19 @@
 # distinct in the shared repo. Retention is applied per (host, paths),
 # so each machine gets its own 7d/4w/6m window.
 #
+# What is deliberately not backed up: built code. We want what can be rebuilt
+# from source, not the output. The bare-name excludes below ('dist', 'build',
+# 'node_modules', '.venv') match a directory of that name at any depth, which
+# covers orchard's per-site build/ directories. Cargo's target/ dirs are the
+# largest thing on disk by far, about 48GB across the seven archived Rust
+# projects, and they are skipped by --exclude-caches rather than by name:
+# cargo writes a CACHEDIR.TAG into every target/, which is exactly what that
+# flag looks for.
+#
+# orchard/bin is excluded by full path on purpose. A bare --exclude='bin'
+# would also drop analytics-rust/src/bin and repos-rust/src/bin, which are
+# Rust source, not output.
+#
 # Credentials live in ~/.restic/ (mounted from the bythewood-restic volume):
 #   ~/.restic/password   restic repo password (0600)
 #   ~/.restic/b2-env     exports B2_ACCOUNT_ID, B2_ACCOUNT_KEY, RESTIC_HOST (0600)
@@ -52,6 +65,7 @@ restic backup \
     --exclude='dist' \
     --exclude='build' \
     --exclude='.cache' \
+    --exclude="$HOME/code/orchard/bin" \
     --exclude='.vite' \
     --exclude='*.pyc' \
     "$HOME/.claude" \
