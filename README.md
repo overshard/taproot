@@ -28,7 +28,9 @@ taproot/
     │       ├── restic-status.sh        last snapshot per host across repos
     │       └── code-sync.sh            pull existing repos + clone new ones from GitHub
     └── aiagent/
-        └── Dockerfile              Debian 13 + llama.cpp CUDA + pi, loopback only
+        ├── Dockerfile              Debian 13 + llama.cpp CUDA + pi, loopback only
+        └── scripts/                copied to ~/scripts/ in the container
+            └── webdev-exec.sh          run a build tool over in webdev
 ```
 
 ## What runs where
@@ -64,13 +66,14 @@ host where docker needs no sudo, override it: `make build DOCKER=docker`.
 ## The two containers
 
 Both are Debian 13, both run as UID 1001, and both mount `bythewood-code`, so
-they see the same `~/code`. That is the only thing they share. One is built to
-write code, the other to run a model.
+they see the same `~/code`. One is built to write code, the other to run a
+model, and the one that runs the model borrows the other's toolchain across the
+docker socket rather than carrying a copy.
 
 | | `webdev` | `aiagent` |
 |---|---|---|
 | For | writing and building | running a local coding agent |
-| Toolchains | Go, uv, Bun, typst, Docker CLI, Playwright | none, by design |
+| Toolchains | Go, uv, Bun, typst, Docker CLI, Playwright | none of its own; borrows webdev's |
 | GPU | no | `--gpus all`, required |
 | Publishes | 8000, for dev servers | nothing |
 | Image | 3.5 GB | 2.2 GB |
@@ -153,6 +156,14 @@ to the run:
 docker run --rm --gpus all --volume bythewood-ai-models:/models overshard/aiagent:latest -hf <repo>:<quant> --alias local
 ```
 
+### Helper scripts
+
+In `~/scripts/` and on `PATH`:
+
+| Command | What it does |
+|---|---|
+| `webdev-exec` | Run a command in `webdev` against the same source tree; symlinked to `go`, `gofmt` and `bun`, so those just work |
+
 ### Things that are not obvious
 
 - `--gpus all` or it loads nothing at all: without the driver injection
@@ -162,8 +173,21 @@ docker run --rm --gpus all --volume bythewood-ai-models:/models overshard/aiagen
 - The `q4_0` KV cache flags are load bearing, not tuning. Qwen3.5 is a hybrid
   attention model, so only 8 of its 32 layers hold a growing cache; at 128k
   that is about 1.2 GB quantized against roughly 4.3 GB at f16.
-- **It has no Go, bun or node.** This container runs an agent, it does not
-  build, so the agent cannot compile what it writes. Build in `webdev`.
+- **It has no toolchain and does not need one.** `go`, `gofmt` and `bun` on
+  its `PATH` are symlinks to `webdev-exec`, which runs the real tool over in
+  `webdev` against the same `bythewood-code` volume and translates
+  `/home/ai/code` to `/home/dev/code` on the way. The agent types
+  `go build ./...` and never learns any of this, which is the whole point: a
+  9B model follows a familiar command and will not reliably assemble a
+  `docker exec` from a paragraph of instructions. With `webdev` stopped the
+  wrappers say so and exit 127, so an unbuildable session looks like an
+  unbuildable session rather than a passing one.
+- **The socket mount is host root.** The wrappers reach the daemon through
+  `/var/run/docker.sock`, which is `root:root` 660, so `ai` has passwordless
+  sudo for `/usr/bin/docker` and nothing else. The narrowing is tidiness, not
+  security: anything that can talk to the daemon can start a privileged
+  container. This is worth it here only because both containers are on one
+  trusted desktop and the agent is working on the same code either way.
 - An `AGENTS.md` is written to `/home/ai/AGENTS.md` by the Dockerfile itself,
   where pi finds it by walking up from its working directory. It earns its
   place: measured against this 9B, its absence produced a stale Vite major and

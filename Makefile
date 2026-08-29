@@ -19,7 +19,8 @@ WEBDEV_RUN = --detach --name bythewood-webdev --init --restart unless-stopped \
 AIAGENT_RUN = --detach --name bythewood-aiagent --init --gpus all \
 	--volume bythewood-code:/home/ai/code \
 	--volume bythewood-ssh:/home/ai/.ssh \
-	--volume bythewood-ai-models:/models
+	--volume bythewood-ai-models:/models \
+	--volume /var/run/docker.sock:/var/run/docker.sock
 
 .DEFAULT_GOAL := help
 .PHONY: help volumes build webdev aiagent swap-webdev swap-aiagent \
