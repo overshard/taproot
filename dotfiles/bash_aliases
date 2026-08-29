@@ -1,5 +1,4 @@
-# Helper scripts (backup, restore, sync, status) live in ~/scripts and are
-# invokable as bare commands from anywhere.
-export PATH="$HOME/scripts:$PATH"
+# ~/scripts (restic-backup, restic-restore, restic-status, code-sync) is on PATH
+# from the image itself, in both login and non-login shells.
 
 alias ls='LC_COLLATE=C ls --color=auto -h --group-directories-first'
