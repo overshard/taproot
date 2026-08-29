@@ -4,47 +4,40 @@
 # No nodejs, no npm, no Rust. Work lives in the four bythewood-* volumes, so the
 # container itself is disposable.
 #
-# Commands are one line each so they paste into PowerShell and sh alike. Run
-# them from a clone of this repo; the build needs it as context.
+# Everything below is driven by the Makefile at the root of this repo, which is
+# also the build context. From a clone:
 #
-# Build or rebuild:
-#     docker build --tag overshard/webdev:latest -f containers/webdev/Dockerfile .
+#     make up          create whatever is missing and start it; safe to re-run
+#     make update      rebuild this image and replace the running container
+#     make doctor      what exists, what is running, and what to type next
+#     make shell       get in, via tmux
 #
-# Replace a running container with the new image (volumes survive, tmux does not):
-#     docker rm --force bythewood-webdev
-#     docker run --detach --name bythewood-webdev --init --restart unless-stopped --publish 8000:8000 --volume bythewood-code:/home/dev/code --volume bythewood-claude:/home/dev/.claude --volume bythewood-ssh:/home/dev/.ssh --volume bythewood-restic:/home/dev/.restic --volume /var/run/docker.sock:/var/run/docker.sock overshard/webdev:latest
+# `make update` works from inside this container. Replacing it directly cannot:
+# `docker rm --force` on your own container kills the make process doing the
+# removing, so a throwaway docker:cli is what performs the swap. Your shell
+# drops when the old container goes; `docker exec -it bythewood-webdev tmux`
+# from the host brings you back.
 #
-# Stop and start without replacing:
-#     docker stop bythewood-webdev
-#     docker start bythewood-webdev
+# A machine that has never run this needs Docker, and a git key at
+# ~/.ssh/home_key that is on GitHub:
 #
-# Get in:
-#     docker exec -it bythewood-webdev tmux
-#
-# Fresh machine, once. Needs Docker running and ~/.ssh/home_key on GitHub:
-#     docker volume create bythewood-code
-#     docker volume create bythewood-claude
-#     docker volume create bythewood-ssh
-#     docker volume create bythewood-restic
-#     (build and run, as above)
+#     make up
 #     docker cp $HOME/.ssh/home_key bythewood-webdev:/home/dev/.ssh/home_key
 #     docker exec bythewood-webdev sh -c "chmod 700 /home/dev/.ssh && chmod 600 /home/dev/.ssh/home_key"
-#     docker exec -it bythewood-webdev nvim /home/dev/.restic/password
-#     docker exec -it bythewood-webdev nvim /home/dev/.restic/b2-env
+#     docker exec -it bythewood-webdev restic-setup
 #     docker exec -it bythewood-webdev restic-restore
-#     docker exec bythewood-webdev sh -c "ln -snf /home/dev/code/taproot/dotfiles/claude/skills /home/dev/.claude/skills && ln -snf /home/dev/code/taproot/dotfiles/claude/status-line.sh /home/dev/.claude/status-line.sh"
 #
-# b2-env holds B2_ACCOUNT_ID, B2_ACCOUNT_KEY and RESTIC_HOST ("desktop" or
-# "laptop"). restic-restore is the only way the memory vault comes back; that
-# repo has no git remote. The last line must run after the volume mounts,
-# because /home/dev/.claude is a volume and shadows the image.
+# The 600 matters: ssh refuses anything looser, and a key copied off Windows
+# arrives with no usable mode. `restic-setup` prompts for the B2 credentials and
+# checks them, so there is no file to hand-edit and get subtly wrong; then
+# `restic-restore` is the only way the memory vault comes back, that repo having
+# no git remote anywhere. `make doctor` reports on all of this.
 #
 # Gotchas: --init or tmux leaves zombies. docker.sock is root:root 660, so
 # docker needs sudo in here. --publish is what makes port 8000 reachable from
 # the host browser. Bind mounts under /home/dev silently mount empty, because
 # the daemon is Docker Desktop and resolves paths on the Windows side; use
 # named volumes.
-
 
 FROM debian:trixie-slim
 

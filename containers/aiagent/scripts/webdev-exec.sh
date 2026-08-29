@@ -48,8 +48,8 @@ state=$(sudo docker inspect -f '{{.State.Running}}' "$CONTAINER" 2>/dev/null || 
 if [ "$state" != "true" ]; then
     echo "webdev-exec: cannot run '$cmd': the $CONTAINER container is not running." >&2
     echo "webdev-exec: this container has no toolchain of its own; it borrows webdev's." >&2
-    echo "webdev-exec: ask the human to start it (\`make swap-webdev\`, or" >&2
-    echo "webdev-exec: \`docker start $CONTAINER\` if it already exists), or carry on with" >&2
+    echo "webdev-exec: ask the human to start it (\`make up\` from a taproot" >&2
+    echo "webdev-exec: clone, or \`docker start $CONTAINER\`), or carry on with" >&2
     echo "webdev-exec: work that does not need to build. Do not claim the code builds." >&2
     exit 127
 fi

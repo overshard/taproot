@@ -4,6 +4,50 @@ What holds when the surface turns.
 
 Dotfiles, containers, and the configs that make a machine mine.
 
+## Three situations
+
+**Nothing here yet.** A machine that has never run this. Needs Docker, and a
+git key at `~/.ssh/home_key` that is on GitHub.
+
+```sh
+make up
+docker cp $HOME/.ssh/home_key bythewood-webdev:/home/dev/.ssh/home_key
+docker exec bythewood-webdev sh -c "chmod 700 /home/dev/.ssh && chmod 600 /home/dev/.ssh/home_key"
+docker exec -it bythewood-webdev restic-setup
+docker exec -it bythewood-webdev restic-restore
+make shell
+```
+
+`make up` makes the volumes, builds the image and starts the container. The
+three lines after it are the parts no image can carry: your git key, your
+backup credentials, and the data itself. `restic-restore` is the only way the
+memory vault comes back, because that repo has no git remote anywhere.
+
+**Something changed.** A new tool in the Dockerfile, a dotfile edit, a Debian
+update worth picking up.
+
+```sh
+make update
+```
+
+This rebuilds and replaces. It works from inside the container it is replacing:
+your shell drops for a couple of seconds and `docker exec -it bythewood-webdev
+tmux` from the host brings you back. Volumes are untouched, so nothing you care
+about is in the container being thrown away.
+
+**Something is broken.** Something is down, missing, or not working.
+
+```sh
+make doctor
+```
+
+Read-only. It prints every container, volume and credential, and next to
+anything wrong, the command that fixes it. Most answers are `make up`, which is
+idempotent and repairs as readily as it installs.
+
+Add `C=aiagent` to any of the three to work on the other container. It defaults
+to `webdev`, which is the one you live in.
+
 ## What is this?
 
 The single deep root beneath everything I work on. Personal infrastructure for
@@ -23,6 +67,7 @@ taproot/
     ├── webdev/
     │   ├── Dockerfile              the vessel: Debian 13 dev image
     │   └── scripts/                copied to ~/scripts/ in the container
+    │       ├── restic-setup.sh         check and enter the B2 credentials
     │       ├── restic-backup.sh        manual restic snapshot to B2
     │       ├── restic-restore.sh       pull latest snapshot from B2
     │       ├── restic-status.sh        last snapshot per host across repos
@@ -50,18 +95,19 @@ in a comment. `make` on its own lists them.
 
 | Target | What it does |
 |---|---|
-| `volumes` | Create the named volumes that hold everything |
-| `build` | Build both images |
-| `webdev` / `aiagent` | Build one image |
-| `swap-webdev` / `swap-aiagent` | Replace a running container with the built image |
-| `shell-webdev` / `shell-aiagent` | Attach via tmux |
-| `stop-aiagent` | Stop the model server and free the VRAM |
+| `up` | Create whatever is missing and start it. Safe to re-run, and the repair command |
+| `update` | Rebuild the image and replace the running container |
+| `doctor` | What exists, what is running, what to type next |
+| `shell` | Attach via tmux |
+| `stop` | Stop it without replacing anything |
 | `models` | Fetch the weights once; the only step that needs the network |
 | `dotfiles` | Link claude skills and the status line into the volume |
-| `push` | Push main to every remote |
 
-The docker socket is root-owned, so `DOCKER` defaults to `sudo docker`. On a
-host where docker needs no sudo, override it: `make build DOCKER=docker`.
+All except `models` and `dotfiles` take `C=webdev` (the default) or
+`C=aiagent`.
+
+The docker socket is root-owned, so every command goes through `sudo`. On a
+host where docker needs none, turn it off: `make up SUDO=`.
 
 ## The two containers
 
@@ -92,16 +138,9 @@ the container itself is disposable. Delete it and make a new one whenever you
 like; that is the normal way to pick up a new image.
 
 ```sh
-make webdev
-make swap-webdev
-make shell-webdev
-```
-
-Stop and start again without replacing anything:
-
-```sh
-docker stop bythewood-webdev
-docker start bythewood-webdev
+make update    # rebuild the image and replace the container
+make shell     # get in
+make stop      # stop it, without replacing anything
 ```
 
 ### Things that are not obvious
@@ -129,6 +168,7 @@ All in `~/scripts/` and on `PATH`:
 
 | Command | What it does |
 |---|---|
+| `restic-setup`   | Check the B2 credentials, and walk through entering them if they are missing or wrong |
 | `restic-backup`  | Manual restic backup to B2; snapshot tagged with `$RESTIC_HOST` |
 | `restic-restore` | Pull latest snapshot from B2; existing data archived first |
 | `restic-status`  | Last snapshot per host across both restic repos, plus repo size |
@@ -142,18 +182,17 @@ The server binds loopback and publishes nothing, so only pi inside the
 container can reach it and it needs no API key.
 
 ```sh
-make aiagent
-make models          # once, the only step that reaches Hugging Face
-make swap-aiagent
-make shell-aiagent   # then type: pi
-make stop-aiagent    # frees the VRAM
+make models             # once, the only step that reaches Hugging Face
+make up C=aiagent
+make shell C=aiagent    # then type: pi
+make stop C=aiagent     # frees the VRAM
 ```
 
 Serving a different model needs no rebuild, just llama-server flags appended
 to the run:
 
 ```sh
-docker run --rm --gpus all --volume bythewood-ai-models:/models overshard/aiagent:latest -hf <repo>:<quant> --alias local
+docker run --rm --gpus all --volume bythewood-models:/models overshard/aiagent:latest -hf <repo>:<quant> --alias local
 ```
 
 ### Helper scripts
@@ -169,7 +208,7 @@ In `~/scripts/` and on `PATH`:
 - `--gpus all` or it loads nothing at all: without the driver injection
   `llama-server` cannot find `libcuda.so.1` and exits before anything else.
 - Weights plus a 128k `q4_0` KV cache sit at about 96% of an 8 GB card, so a
-  second CUDA process will not fit beside it. `make stop-aiagent` frees it.
+  second CUDA process will not fit beside it. `make stop C=aiagent` frees it.
 - The `q4_0` KV cache flags are load bearing, not tuning. Qwen3.5 is a hybrid
   attention model, so only 8 of its 32 layers hold a growing cache; at 128k
   that is about 1.2 GB quantized against roughly 4.3 GB at f16.
@@ -197,46 +236,24 @@ In `~/scripts/` and on `PATH`:
 
 ## A machine that has never run this before
 
-Needs Docker running and an SSH key at `~/.ssh/home_key` added to GitHub.
+The steps are at the top of this file, under **Three situations**. Two notes on
+the parts that are not a `make` target, because neither can be:
 
-```sh
-make volumes
-make build
-make swap-webdev
-```
+The git key's `600` matters. ssh refuses anything looser, and a key copied off
+Windows arrives with no usable mode, which is why the `chmod` is its own line
+rather than something `docker cp` could have done.
 
-Give it your git key. The 600 matters: ssh refuses anything looser, and a key
-copied off Windows arrives with no usable mode.
+`make up` links the Claude skills and status line for you, but only because it
+runs `make dotfiles` after the container exists. They cannot be baked into the
+image: `/home/dev/.claude` is a volume and shadows whatever the image put
+there.
 
-```sh
-docker cp $HOME/.ssh/home_key bythewood-webdev:/home/dev/.ssh/home_key
-docker exec bythewood-webdev sh -c "chmod 700 /home/dev/.ssh && chmod 600 /home/dev/.ssh/home_key"
-```
-
-Add restic credentials, pasted from 1Password, then pull everything back from
-B2. That restore is the only way the memory vault returns, because that repo
-has no git remote anywhere:
-
-```sh
-docker exec -it bythewood-webdev nvim /home/dev/.restic/password
-docker exec -it bythewood-webdev nvim /home/dev/.restic/b2-env
-docker exec -it bythewood-webdev restic-restore
-```
-
-Finally point Claude Code at the version-controlled skills and status line.
-This cannot be baked into the image, because `/home/dev/.claude` is a volume
-and shadows whatever the image puts there:
-
-```sh
-make dotfiles
-```
-
-On a machine with an NVIDIA card, pull the model weights and bring the agent
-up. Skip this on a machine without one; nothing else depends on it:
+On a machine with an NVIDIA card, pull the weights and bring the agent up too.
+Skip it on a machine without one; nothing else depends on it:
 
 ```sh
 make models
-make swap-aiagent
+make up C=aiagent
 ```
 
 ## The dotfiles
@@ -261,18 +278,30 @@ Restic passwords and B2 application keys live in 1Password.
 
 ### Credentials
 
-Written by hand into the `bythewood-restic` volume, pasted from 1Password (see
-the setup above). The `b2-env` file looks like:
+`restic-setup` is the way in. It reports what is currently set, verifies it by
+actually opening the repository, and prompts for anything missing, writing both
+files at `0600`:
 
 ```sh
-export B2_ACCOUNT_ID="<keyID>"
-export B2_ACCOUNT_KEY="<applicationKey>"
-export RESTIC_HOST="desktop"   # or "laptop"
+restic-setup            # check, and fix whatever is wrong
+restic-setup --check    # check only, quietly; this is what `make doctor` calls
 ```
+
+It also carries the instructions for minting a fresh B2 application key, for
+the day the one in 1Password has been revoked. There is nothing to hand-edit;
+the two files it manages in the `bythewood-restic` volume are:
+
+| File | What it holds |
+|---|---|
+| `~/.restic/b2-env` | `B2_ACCOUNT_ID`, `B2_ACCOUNT_KEY`, and `RESTIC_HOST` (`desktop` or `laptop`) |
+| `~/.restic/password` | The webdev repo password |
 
 Optional: drop the alpine repo password at `~/.restic/alpine-password` so
 `restic-status` can still report on that repository. It holds the old server's
 backup history even though the server itself is gone.
+
+**The repo password is not recoverable.** Lose it and the snapshots in that
+repository are lost with it. It lives in 1Password.
 
 ### Daily flow
 

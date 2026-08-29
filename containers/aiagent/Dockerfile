@@ -17,7 +17,7 @@
 #
 # Replace a running container with the new image:
 #     docker rm --force bythewood-aiagent
-#     docker run --detach --name bythewood-aiagent --init --gpus all --volume bythewood-code:/home/ai/code --volume bythewood-ssh:/home/ai/.ssh --volume bythewood-ai-models:/models --volume /var/run/docker.sock:/var/run/docker.sock overshard/aiagent:latest
+#     docker run --detach --name bythewood-aiagent --init --gpus all --volume bythewood-code:/home/ai/code --volume bythewood-ssh:/home/ai/.ssh --volume bythewood-models:/models --volume /var/run/docker.sock:/var/run/docker.sock overshard/aiagent:latest
 #
 # Get in, then type: pi
 #     docker exec -it bythewood-aiagent tmux
