@@ -19,15 +19,15 @@ changes and stays quiet when nothing needs to.
 taproot/
 ├── dotfiles/                       the soil: bash, git, neovim, tmux
 ├── containers/
-│   └── webdev/
-│       ├── Dockerfile              the vessel: Ubuntu 24.04 dev image
-│       ├── bootstrap.ps1           one-shot host setup (Windows)
-│       └── scripts/                copied to ~/scripts/ in the container
-│           ├── restic-backup.sh        manual restic snapshot to B2
-│           ├── restic-restore.sh       pull latest snapshot from B2
-│           ├── restic-status.sh        last snapshot per host across repos
-│           ├── code-sync.sh            pull existing repos + clone new ones from GitHub
-│           └── server-health-check.sh  ssh into alpine and run its health check
+│   ├── webdev/
+│   │   ├── Dockerfile              the vessel: Debian 13 dev image
+│   │   └── scripts/                copied to ~/scripts/ in the container
+│   │       ├── restic-backup.sh        manual restic snapshot to B2
+│   │       ├── restic-restore.sh       pull latest snapshot from B2
+│   │       ├── restic-status.sh        last snapshot per host across repos
+│   │       └── code-sync.sh            pull existing repos + clone new ones from GitHub
+│   └── ai/
+│       └── Dockerfile              local llama.cpp + pi, loopback only
 └── hosts/
     └── alpine/
         ├── quickstart.sh           provision a fresh server
@@ -60,37 +60,100 @@ the shared `bythewood-edge` network, so there is no per-project port to track.
 
 ## The container
 
-An Ubuntu 24.04 development workstation with everything already in the ground:
-Python (uv), Node, Bun, Docker CLI, neovim, tmux, Claude, and Playwright
-Chromium (for the Claude playwright MCP). Kept alive with `sleep infinity`.
+A Debian 13 development workstation with everything already in the ground: Go,
+Python (uv), Bun, Claude Code, Docker CLI, typst, neovim, tmux, restic, and
+Playwright Chromium (driven by `playwright-cli`, not an MCP). No nodejs and no
+npm; Bun runs Playwright, which was the last thing that needed them. No Rust
+toolchain either, since every Rust project here is archived. Kept alive with
+`sleep infinity`.
 
-### Bootstrap on a fresh Windows host
+Your work lives in four `bythewood-*` volumes rather than in the container, so
+the container itself is disposable. Delete it and make a new one whenever you
+like; that is the normal way to pick up a new image.
 
-Prereqs: Docker Desktop installed and running, an SSH key at
-`$HOME\.ssh\home_key` (and `.pub`) added to GitHub. Nothing else.
+Every command below is a single line on purpose, so it pastes into PowerShell
+and sh alike. Run them from a clone of this repo, which is the build context.
 
-```powershell
-irm https://raw.githubusercontent.com/overshard/taproot/main/containers/webdev/bootstrap.ps1 -OutFile bootstrap.ps1
-powershell -ExecutionPolicy Bypass -File .\bootstrap.ps1 laptop
-```
-
-`-ExecutionPolicy Bypass` is needed because PowerShell blocks scripts pulled
-from the internet by default; the flag scopes to that one invocation, no
-persistent system change. Use `desktop` or `laptop` as the first arg to tag
-this machine's restic snapshots. Re-run any time; every step is idempotent.
-
-Bootstrap creates the four `bythewood-*` volumes, clones taproot into
-`bythewood-code` via a throwaway helper container (so the host filesystem stays
-clean), builds the image using `docker.sock` and the volume-resident taproot,
-runs the container, copies your host SSH key into the volume, and prompts for
-restic credentials. Pass `-Force` to pull the latest taproot, rebuild the
-image, and recreate the container; pass `-Restore` to also pull data from B2.
-
-Then connect:
+### Build and run
 
 ```sh
-docker exec -it bythewood-webdev tmux       # TUI workflow
+docker build --tag overshard/webdev:latest -f containers/webdev/Dockerfile .
 ```
+
+Swap a running container for a freshly built image. Volumes are untouched, so
+nothing you care about is lost; you do lose the running tmux session:
+
+```sh
+docker rm --force bythewood-webdev
+docker run --detach --name bythewood-webdev --init --restart unless-stopped --publish 8000:8000 --volume bythewood-code:/home/dev/code --volume bythewood-claude:/home/dev/.claude --volume bythewood-ssh:/home/dev/.ssh --volume bythewood-restic:/home/dev/.restic --volume /var/run/docker.sock:/var/run/docker.sock overshard/webdev:latest
+```
+
+Stop and start again without replacing anything:
+
+```sh
+docker stop bythewood-webdev
+docker start bythewood-webdev
+```
+
+Then get in:
+
+```sh
+docker exec -it bythewood-webdev tmux
+```
+
+### A machine that has never run this before
+
+Needs Docker running and an SSH key at `~/.ssh/home_key` added to GitHub.
+
+Make the four volumes that hold everything, then build and run as above:
+
+```sh
+docker volume create bythewood-code
+docker volume create bythewood-claude
+docker volume create bythewood-ssh
+docker volume create bythewood-restic
+```
+
+Give it your git key. The 600 matters: ssh refuses anything looser, and a key
+copied off Windows arrives with no usable mode.
+
+```sh
+docker cp $HOME/.ssh/home_key bythewood-webdev:/home/dev/.ssh/home_key
+docker exec bythewood-webdev sh -c "chmod 700 /home/dev/.ssh && chmod 600 /home/dev/.ssh/home_key"
+```
+
+Add restic credentials, pasted from 1Password, then pull everything back from
+B2. That restore is the only way the memory vault returns, because that repo
+has no git remote anywhere:
+
+```sh
+docker exec -it bythewood-webdev nvim /home/dev/.restic/password
+docker exec -it bythewood-webdev nvim /home/dev/.restic/b2-env
+docker exec -it bythewood-webdev restic-restore
+```
+
+Finally point Claude Code at the version-controlled skills and status line.
+This cannot be baked into the image, because `/home/dev/.claude` is a volume
+and shadows whatever the image puts there. Re-run it any time:
+
+```sh
+docker exec bythewood-webdev sh -c "ln -snf /home/dev/code/taproot/dotfiles/claude/skills /home/dev/.claude/skills && ln -snf /home/dev/code/taproot/dotfiles/claude/status-line.sh /home/dev/.claude/status-line.sh"
+```
+
+### Things that are not obvious
+
+- `--init` is required. Without a real PID 1, tmux leaves zombies behind and
+  they accumulate for the life of the container.
+- The mounted `docker.sock` is `root:root` mode 660, so docker commands inside
+  need `sudo`. Being in the docker group does not help, so there is no docker
+  group.
+- `--publish` is what makes a dev server on port 8000 reachable from the host
+  browser. Publishing a port on some *other* container does not reach this one;
+  to curl a neighbour, share its network namespace with `--network container:<name>`.
+- Bind mounts of paths under `/home/dev` do not work from inside the container.
+  The daemon is Docker Desktop on the Windows host and resolves the source path
+  against its own filesystem, where it does not exist, so it silently mounts an
+  empty directory instead of failing. Named volumes are what work.
 
 ### Helper scripts inside the container
 
@@ -98,11 +161,10 @@ All in `~/scripts/` and on `PATH`:
 
 | Command | What it does |
 |---|---|
-| `restic-backup`        | Manual restic backup to B2; snapshot tagged with `$RESTIC_HOST` |
-| `restic-restore`       | Pull latest snapshot from B2; existing data archived first |
-| `restic-status`        | Last snapshot per host across both restic repos, plus repo size |
-| `code-sync`            | `git fetch && git pull --ff-only` for every repo under `~/code/`, then clones any non-archived non-fork repos owned by overshard on GitHub that aren't local yet |
-| `server-health-check`  | SSH into alpine and run its `/root/server-health-check.sh`. Override target with `$ALPINE_HOST` |
+| `restic-backup`  | Manual restic backup to B2; snapshot tagged with `$RESTIC_HOST` |
+| `restic-restore` | Pull latest snapshot from B2; existing data archived first |
+| `restic-status`  | Last snapshot per host across both restic repos, plus repo size |
+| `code-sync`      | `git fetch && git pull --ff-only` for every repo under `~/code/`, then clones any non-archived non-fork repos owned by overshard on GitHub that aren't local yet |
 
 ## The dotfiles
 
@@ -146,8 +208,8 @@ Restic passwords and B2 application keys live in 1Password.
 
 ### Webdev credentials
 
-Placed automatically by `bootstrap.ps1` (it prompts for them and writes into
-the `bythewood-restic` volume). The `b2-env` file ends up looking like:
+Written by hand into the `bythewood-restic` volume, pasted from 1Password (see
+the container setup above). The `b2-env` file looks like:
 
 ```sh
 export B2_ACCOUNT_ID="<keyID>"
@@ -155,8 +217,9 @@ export B2_ACCOUNT_KEY="<applicationKey>"
 export RESTIC_HOST="desktop"   # or "laptop"
 ```
 
-Optional: drop the alpine repo password at `~/.restic/alpine-password`
-(prompted for during bootstrap) so `restic-status` can report on the alpine repo too.
+Optional: drop the alpine repo password at `~/.restic/alpine-password` so
+`restic-status` can report on the alpine repo too. That repository still holds
+the old server's backup history even though the server itself is gone.
 
 ### Alpine credentials
 
