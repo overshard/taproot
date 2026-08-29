@@ -1,59 +1,47 @@
-# ai
+# aiagent
 #
-# Local AI in one container: a llama.cpp CUDA server holding Qwen3.5-9B at 128k
-# context, plus the pi coding agent and its web-access extension. Sized for an
-# 8GB Ampere card. No telemetry, no update checks, no published port.
+# Local AI in one container: a llama.cpp CUDA server holding a 9B coding model
+# at 128k context, plus the pi coding agent. Sized for an 8GB Ampere card.
+# No telemetry, no update checks, no published port.
 #
 # Build (from the repo root, ~15 min the first time):
-#     docker build --tag overshard/ai:latest -f containers/ai/Dockerfile .
+#     docker build --tag overshard/aiagent:latest -f containers/aiagent/Dockerfile .
 #
 # Fetch the weights once, the only time it needs Hugging Face:
-#     docker run --rm --env LLAMA_ARG_OFFLINE=false \
-#         --volume bythewood-ai-models:/models overshard/ai:latest --list-devices
+#     docker run --rm --env LLAMA_ARG_OFFLINE=false --volume bythewood-ai-models:/models overshard/aiagent:latest --list-devices
 #
 # Run:
-#     docker run --detach --name bythewood-ai --init --gpus all \
-#         --volume bythewood-code:/home/ai/code \
-#         --volume bythewood-ssh:/home/ai/.ssh \
-#         --volume bythewood-ai-models:/models \
-#         overshard/ai:latest
+#     docker run --detach --name bythewood-aiagent --init --gpus all --volume bythewood-code:/home/ai/code --volume bythewood-ssh:/home/ai/.ssh --volume bythewood-ai-models:/models overshard/aiagent:latest
 #
-# Connect:  docker exec -it bythewood-ai tmux      then type: pi
-# Stop:     docker stop bythewood-ai               (frees the VRAM)
+# Connect:  docker exec -it bythewood-aiagent tmux      then type: pi
+# Stop:     docker stop bythewood-aiagent               (frees the VRAM)
 #
-# Optional egress lockdown, needs --cap-add NET_ADMIN on the run, once per start:
-#     docker exec --user root bythewood-ai sh -c '\
-#         iptables -P OUTPUT DROP; \
-#         iptables -A OUTPUT -o lo -j ACCEPT; \
-#         iptables -A OUTPUT -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT; \
-#         iptables -A OUTPUT -p udp --dport 53 -j ACCEPT; \
-#         iptables -A OUTPUT -p tcp --dport 53 -j ACCEPT; \
-#         iptables -A OUTPUT -p tcp --dport 80 -j ACCEPT; \
-#         iptables -A OUTPUT -p tcp --dport 443 -j ACCEPT'
+# Serve a different model without rebuilding, by appending llama-server flags:
+#     docker run ... overshard/aiagent:latest -hf <repo>:<quant> --alias local ...
 
 
-FROM ubuntu:24.04 AS build
+FROM debian:trixie-slim AS build
 
-# Avoid CUDA 13.2, which produces gibberish from low-bit quants.
+# CUDA 13.2 produces gibberish from low-bit quants.
 ARG CUDA=13-3
 
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
         ca-certificates curl git cmake ninja-build build-essential \
         libcurl4-openssl-dev && \
-    curl -fsSLo /tmp/keyring.deb https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2404/x86_64/cuda-keyring_1.1-1_all.deb && \
+    curl -fsSLo /tmp/keyring.deb https://developer.download.nvidia.com/compute/cuda/repos/debian13/x86_64/cuda-keyring_1.1-1_all.deb && \
     dpkg -i /tmp/keyring.deb && \
     apt-get update && \
     apt-get install -y --no-install-recommends \
         cuda-nvcc-${CUDA} cuda-cudart-dev-${CUDA} libcublas-dev-${CUDA} && \
-    rm -rf /var/lib/apt/lists/*
+    rm -rf /var/lib/apt/lists/* /tmp/keyring.deb
 
 ENV PATH=/usr/local/cuda/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 
-# Ampere (sm_86) alone keeps the build short and the image small; change
-# CMAKE_CUDA_ARCHITECTURES for another card. FA_ALL_QUANTS is what makes flash
-# attention work with a quantized KV cache. Static libs because upstream ships
-# its shared objects without a SONAME, which ldconfig then refuses to cache.
+# sm_86 alone keeps the build short; change it for another card.
+# FA_ALL_QUANTS is what makes flash attention work with a quantized KV cache.
+# Static libs because upstream ships shared objects without a SONAME, which
+# ldconfig then refuses to cache.
 RUN git clone --depth 1 https://github.com/ggml-org/llama.cpp /tmp/src && \
     cmake -S /tmp/src -B /tmp/build -G Ninja \
         -DCMAKE_BUILD_TYPE=Release \
@@ -65,11 +53,11 @@ RUN git clone --depth 1 https://github.com/ggml-org/llama.cpp /tmp/src && \
         -DLLAMA_CURL=ON \
         -DLLAMA_BUILD_TESTS=OFF \
         -DLLAMA_BUILD_EXAMPLES=OFF && \
-    cmake --build /tmp/build --target llama-server -j"$(nproc)" && \
-    strip /tmp/build/bin/llama-server
+    cmake --build /tmp/build --target llama-server llama-bench -j"$(nproc)" && \
+    strip /tmp/build/bin/llama-server /tmp/build/bin/llama-bench
 
 
-FROM ubuntu:24.04
+FROM debian:trixie-slim
 
 ARG CUDA=13-3
 
@@ -79,14 +67,15 @@ ENV DEBIAN_FRONTEND=noninteractive \
     LC_ALL=C.UTF-8 \
     TERM=xterm-256color \
     HOME=/home/ai \
-    LLAMA_CACHE=/models
+    LLAMA_CACHE=/models \
+    PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 
 # Node, not bun: pi's extension installer shells out to `npm root -g`.
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
         ca-certificates curl git openssh-client jq tmux less nano procps \
         ripgrep fd-find iptables libgomp1 libcurl4 && \
-    curl -fsSLo /tmp/keyring.deb https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2404/x86_64/cuda-keyring_1.1-1_all.deb && \
+    curl -fsSLo /tmp/keyring.deb https://developer.download.nvidia.com/compute/cuda/repos/debian13/x86_64/cuda-keyring_1.1-1_all.deb && \
     dpkg -i /tmp/keyring.deb && \
     apt-get update && \
     apt-get install -y --no-install-recommends \
@@ -94,9 +83,15 @@ RUN apt-get update && \
     curl -fsSL https://deb.nodesource.com/setup_22.x | bash - && \
     apt-get install -y --no-install-recommends nodejs && \
     npm install -g @earendil-works/pi-coding-agent && \
+    npm cache clean --force && \
     rm -rf /var/lib/apt/lists/* /tmp/keyring.deb
 
-COPY --from=build /tmp/build/bin/llama-server /usr/local/bin/llama-server
+COPY --from=build /tmp/build/bin/llama-server /tmp/build/bin/llama-bench /usr/local/bin/
+
+# Debian's /etc/profile assigns PATH outright, so a login shell (every tmux
+# pane) drops anything ENV added. Both this and the ENV above are needed.
+RUN printf 'export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin\n' \
+        > /etc/profile.d/10-path.sh
 
 # UID 1001 matches webdev's dev user so both share the bythewood-code volume.
 # pi fetches its own rg and fd into .pi/agent/bin on first run, which offline
@@ -110,20 +105,19 @@ RUN useradd -m -u 1001 -s /bin/bash ai && \
 COPY dotfiles/bash_aliases /home/ai/.bash_aliases
 COPY dotfiles/tmux.conf /home/ai/.tmux.conf
 # extended-keys lets pi see modified Enter. Appended rather than added to the
-# shared dotfile so webdev's tmux is untouched. No extended-keys-format here,
-# it needs tmux 3.5 and noble ships 3.4.
+# shared dotfile so webdev's tmux is untouched.
 RUN chown ai:ai /home/ai/.bash_aliases /home/ai/.tmux.conf && \
     echo "source ~/.bash_aliases" >> /home/ai/.bashrc && \
-    echo "set -g extended-keys on" >> /home/ai/.tmux.conf
+    printf 'set -g extended-keys on\nset -g extended-keys-format csi-u\n' >> /home/ai/.tmux.conf
 
 WORKDIR /home/ai/code
 USER ai
 
-# web-search.json pins duckduckgo because the default chain ends at Exa's public
-# endpoint when no API keys are set, and workflow "none" because the default
-# blocks on a browser curator that never opens in a container.
+# web-search.json pins duckduckgo because the default chain ends at Exa's
+# public endpoint when no API keys are set, and workflow "none" because the
+# default blocks on a browser curator that never opens in a container.
 RUN pi install npm:pi-web-access && \
-    printf '%s' '{"providers":{"local":{"baseUrl":"http://127.0.0.1:8000/v1","api":"openai-completions","apiKey":"none","compat":{"supportsDeveloperRole":false,"supportsReasoningEffort":false},"models":[{"id":"local","name":"Qwen3.5-9B Q4_K_S (local)","contextWindow":131072,"maxTokens":8192,"input":["text"],"cost":{"input":0,"output":0,"cacheRead":0,"cacheWrite":0}}]}}}' \
+    printf '%s' '{"providers":{"local":{"baseUrl":"http://127.0.0.1:8000/v1","api":"openai-completions","apiKey":"none","compat":{"supportsDeveloperRole":false,"supportsReasoningEffort":false},"models":[{"id":"local","name":"local","contextWindow":131072,"maxTokens":8192,"input":["text"],"cost":{"input":0,"output":0,"cacheRead":0,"cacheWrite":0}}]}}}' \
         > /home/ai/.pi/agent/models.json && \
     printf '%s' '{"packages":["npm:pi-web-access"],"enableInstallTelemetry":false,"enableAnalytics":false}' \
         > /home/ai/.pi/agent/settings.json && \
