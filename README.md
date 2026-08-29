@@ -18,7 +18,7 @@ changes and stays quiet when nothing needs to.
 ```
 taproot/
 ├── Makefile                        build, swap, and link everything below
-├── dotfiles/                       the soil: bash, git, neovim, tmux, claude
+├── dotfiles/                       the soil: bash, git, neovim, tmux, claude, agents.md
 └── containers/
     ├── webdev/
     │   ├── Dockerfile              the vessel: Debian 13 dev image
@@ -104,6 +104,11 @@ make stop-aiagent    # frees the VRAM
 
 It shares the `bythewood-code` volume with webdev, so both see the same
 `~/code`. That is why its user is also UID 1001.
+
+`dotfiles/agents.md` is baked in at `/home/ai/AGENTS.md`, where pi finds it by
+walking up from its working directory. It earns its place: measured against a
+9B model, its absence produced a stale Vite major and a cgo SQLite driver that
+compiles and then fails at runtime, and its presence fixed both.
 
 Serving a different model needs no rebuild, just llama-server flags appended
 to the run:
