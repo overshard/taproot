@@ -1,23 +1,38 @@
 # aiagent
 #
-# Local AI in one container: a llama.cpp CUDA server holding a 9B coding model
-# at 128k context, plus the pi coding agent. Sized for an 8GB Ampere card.
-# No telemetry, no update checks, no published port.
+# Qwen3.5-9B at 128k context on a llama.cpp CUDA server, plus the pi coding
+# agent pointed at it. Sized for an 8GB Ampere card. No telemetry, no update
+# checks, no published port. Deliberately has no Go, bun or node: this runs an
+# agent, it does not build.
 #
-# Build (from the repo root, ~15 min the first time):
+# Commands are one line each so they paste into PowerShell and sh alike. Run
+# them from a clone of this repo; the build needs it as context.
+#
+# Build or rebuild (~15 min the first time):
 #     docker build --tag overshard/aiagent:latest -f containers/aiagent/Dockerfile .
 #
-# Fetch the weights once, the only time it needs Hugging Face:
-#     docker run --rm --env LLAMA_ARG_OFFLINE=false --volume bythewood-ai-models:/models overshard/aiagent:latest --list-devices
+# Fetch the weights once, the only step that reaches Hugging Face. Runs the
+# server with offline disabled until it is healthy, then stops it:
+#     make models
 #
-# Run:
+# Replace a running container with the new image:
+#     docker rm --force bythewood-aiagent
 #     docker run --detach --name bythewood-aiagent --init --gpus all --volume bythewood-code:/home/ai/code --volume bythewood-ssh:/home/ai/.ssh --volume bythewood-ai-models:/models overshard/aiagent:latest
 #
-# Connect:  docker exec -it bythewood-aiagent tmux      then type: pi
-# Stop:     docker stop bythewood-aiagent               (frees the VRAM)
+# Get in, then type: pi
+#     docker exec -it bythewood-aiagent tmux
+#
+# Stop, which frees the VRAM:
+#     docker stop bythewood-aiagent
 #
 # Serve a different model without rebuilding, by appending llama-server flags:
-#     docker run ... overshard/aiagent:latest -hf <repo>:<quant> --alias local ...
+#     docker run ... overshard/aiagent:latest -hf <repo>:<quant> --alias local
+#
+# Gotchas: --gpus all or it loads nothing. --init or tmux leaves zombies. The
+# server binds loopback and publishes nothing, so only pi in here reaches it and
+# it needs no API key; that is also why the weights volume is the only state.
+# Weights plus a 128k q4_0 KV cache sit at about 96% of an 8GB card, so a second
+# CUDA process will not fit alongside it.
 
 
 FROM debian:trixie-slim AS build
@@ -104,8 +119,7 @@ RUN useradd -m -u 1001 -s /bin/bash ai && \
 
 COPY dotfiles/bash_aliases /home/ai/.bash_aliases
 COPY dotfiles/tmux.conf /home/ai/.tmux.conf
-# pi walks up from its cwd to find this. Measurably changes what the model
-# reaches for: without it a 9B picks a stale Vite major and a cgo sqlite driver.
+# pi walks up from its cwd to find this.
 COPY dotfiles/agents.md /home/ai/AGENTS.md
 # extended-keys lets pi see modified Enter. Appended rather than added to the
 # shared dotfile so webdev's tmux is untouched.
