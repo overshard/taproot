@@ -1,7 +1,8 @@
 # webdev
 #
 # Ubuntu 24.04 dev container with tmux, neovim, claude code, Bun, uv, cargo, Go,
-# Docker CLI, and Playwright Chromium. Used as a portable development environment
+# Docker CLI, and Playwright Chromium. No nodejs or npm: Bun 1.4 runs Playwright,
+# which was the last thing that needed them. Used as a portable development environment
 # across desktop and laptop, with restic backups to Backblaze B2.
 #
 # Setup is automated by bootstrap.ps1 (idempotent, run from PowerShell on the
@@ -41,8 +42,13 @@
 
 FROM ubuntu:24.04
 
+# BUN_INSTALL is set here, persistently, rather than only for the installer
+# below: it is also what decides where `bun install -g` puts a global binary.
+# Without it globals land in ~/.bun/bin rather than /usr/local/bin, which is
+# where npm used to put them and where the rest of this image looks.
 ENV DEBIAN_FRONTEND=noninteractive \
     TZ=UTC \
+    BUN_INSTALL=/usr/local \
     LANG=C.UTF-8 \
     LC_ALL=C.UTF-8 \
     TERM=xterm-256color \
@@ -59,29 +65,85 @@ RUN apt-get update && \
         # Python
         python3 python3-pip python3-venv \
         # Docker (buildx enables BuildKit cache mounts in Dockerfiles)
-        docker.io docker-compose-v2 docker-buildx \
-        # Node (used for `npx playwright install` and the global @playwright/cli
-        # below; bun is the JS runtime for app code)
-        nodejs npm && \
+        docker.io docker-compose-v2 docker-buildx && \
     curl -fsSL https://astral.sh/uv/install.sh | env UV_INSTALL_DIR=/usr/local/bin sh && \
     curl -fsSL https://bun.sh/install | env BUN_INSTALL=/usr/local bash
+
+# There is no nodejs or npm in this image. Bun 1.4 (2026-08-20) runs Playwright,
+# which was the only thing still keeping them here, so both came out.
+#
+# This symlink is load bearing rather than cosmetic. npm-published CLIs ship a
+# `#!/usr/bin/env node` shebang, so @playwright/cli installs fine under bun and
+# then dies instantly with "env: 'node': No such file or directory" without it.
+# Bun is argv-compatible enough to stand in, which is the same trick the status
+# site already uses through `bun run --bun`, promoted to a global symlink.
+#
+# `npm` is deliberately NOT symlinked. `npm install` and `npm run` would map
+# onto bun cleanly, but `npm ci` has no bun equivalent and would fail in a
+# confusing way. Nothing in this workspace calls npm any more, and a clear
+# "command not found" beats a subtly wrong one.
+# Verified by running a script the way a shebang does, not by `node --version`:
+# bun invoked as `node` with only a flag has no script to execute and exits 1,
+# so anything that probes the Node version will still fail. Nothing here does,
+# but that is the sharp edge of this symlink and it is worth knowing about.
+RUN ln -sf /usr/local/bin/bun /usr/local/bin/node && \
+    echo 'console.log("node shim ok")' > /tmp/shim.js && \
+    node /tmp/shim.js && rm /tmp/shim.js
 
 # Playwright Chromium for the `playwright` skill, which drives the browser via
 # @playwright/cli (installed below) rather than an MCP. Some tools look for stable
 # Chrome at /opt/google/chrome/chrome, so symlink the playwright build there.
 # The chromium-* glob absorbs future playwright revision bumps.
-ENV PLAYWRIGHT_BROWSERS_PATH=/opt/playwright-browsers
-RUN npx --yes playwright@latest install --with-deps chromium && \
-    chmod -R a+rx /opt/playwright-browsers && \
-    mkdir -p /opt/google/chrome && \
-    ln -snf /opt/playwright-browsers/chromium-*/chrome-linux64/chrome /opt/google/chrome/chrome && \
-    test -x /opt/google/chrome/chrome
-
 # @playwright/cli: token-efficient command-line browser automation. The
 # `playwright` skill (~/.claude/skills/playwright) uses this instead of the
 # Playwright MCP; it writes page state to disk so only what's needed enters
 # context (~4x fewer tokens than the MCP on a typical task).
-RUN npm install -g @playwright/cli && command -v playwright-cli
+#
+# PINNED, and the pin is load bearing rather than tidiness.
+#
+# This was unpinned, alongside a separate `playwright@latest` for the browsers:
+# two installs that could drift apart from each other between any two builds.
+# They did, and the newer one does not work here. Measured, holding everything
+# else constant and running in a fresh container each time:
+#
+#     @playwright/cli 0.1.14 -> playwright-core 1.61 -> Chromium 1226   works
+#     @playwright/cli 0.1.18 -> playwright-core 1.63 -> Chromium 1237   fails
+#     unpinned (at time of writing)             -> Chromium 1234        fails
+#
+# The failure is "No usable sandbox" from the zygote host. Chrome-for-Testing
+# builds ship no setuid chrome-sandbox and rely entirely on unprivileged user
+# namespaces, and something in this Docker Desktop on WSL2 setup denies them to
+# the newer builds. Ruled out by testing rather than assumed: it is not the
+# browser directory's permissions (a+rwx fails identically), not seccomp
+# (`--security-opt seccomp=unconfined` does not help), and not capabilities
+# (`--cap-add SYS_ADMIN` does not help). Nothing about it was caused by
+# dropping nodejs; a rebuild on the old image would have hit it too.
+#
+# If a newer Chromium is wanted before that is understood, the escape hatch is
+# to launch with `chromiumSandbox: false` / `--no-sandbox`, which is a real
+# security tradeoff and so is not done here by default.
+#
+# Bump deliberately, and re-run the playwright skill against a real page after.
+ARG PLAYWRIGHT_CLI_VERSION=0.1.14
+RUN bun install -g @playwright/cli@${PLAYWRIGHT_CLI_VERSION} && \
+    command -v playwright-cli && playwright-cli --help >/dev/null
+
+# The browsers come from the CLI's own bundled playwright-core rather than a
+# separately resolved `playwright@latest`, so the download and the code that
+# drives it can never disagree about which Chromium revision to use. That skew
+# is exactly what an unpinned pair of installs invites.
+#
+# Some tools look for stable Chrome at /opt/google/chrome/chrome, so the
+# playwright build is symlinked there. The chromium-* glob absorbs revision
+# bumps when the pin above moves.
+ENV PLAYWRIGHT_BROWSERS_PATH=/opt/playwright-browsers
+RUN CORE="$(find /usr/local/install/global -path '*/playwright-core/cli.js' | head -1)" && \
+    test -n "$CORE" && \
+    node "$CORE" install --with-deps chromium && \
+    chmod -R a+rx /opt/playwright-browsers && \
+    mkdir -p /opt/google/chrome && \
+    ln -snf /opt/playwright-browsers/chromium-*/chrome-linux64/chrome /opt/google/chrome/chrome && \
+    test -x /opt/google/chrome/chrome
 
 RUN ln -snf /usr/share/zoneinfo/UTC /etc/localtime && echo "UTC" > /etc/timezone
 
