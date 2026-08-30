@@ -33,7 +33,7 @@ Plain skill dirs, each `skills/<name>/SKILL.md` with YAML frontmatter (`name`,
 - **journal** wrap the session into the `~/code/memory` vault (the memory contract).
 - **playwright** browser automation via `playwright-cli` (token-efficient, replaces the
   Playwright MCP).
-- **rust** working on the axum + Vite + SQLite projects (replaces rust-analyzer-lsp; note
+- **rust** working on the axum + Vite + SQLite projects (replaces rust-analyzer-lsp, note
   this drops live LSP diagnostics, a skill is instructions only).
 
 ## Setup on a fresh machine
@@ -45,7 +45,7 @@ wiring, after `~/code/taproot` is cloned:
 ```bash
 ln -snf ~/code/taproot/dotfiles/claude/skills         ~/.claude/skills
 ln -snf ~/code/taproot/dotfiles/claude/status-line.sh ~/.claude/status-line.sh
-# settings.json is machine-local; copy the template instead of symlinking:
+# settings.json is machine-local, so copy the template instead of symlinking:
 cp ~/code/taproot/dotfiles/claude/settings.json ~/.claude/settings.json   # then re-add machine-local bits
 ```
 

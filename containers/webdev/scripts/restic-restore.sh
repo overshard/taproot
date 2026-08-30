@@ -2,12 +2,10 @@
 #
 # restic-restore.sh
 #
-# Restore this container from the latest snapshot in Backblaze B2.
-# Existing contents of ~/.claude, ~/code, and ~/.ssh are moved aside to
-# ~/before-restore-<UTC-ISO>/ first so nothing is lost.
-#
-# Note: ~/.claude, ~/code, and ~/.ssh are docker volume mounts, so we move
-# their CONTENTS rather than the directories themselves.
+# Restore this container from the latest snapshot in Backblaze B2. Existing
+# contents of ~/.claude, ~/code, and ~/.ssh are moved aside to
+# ~/before-restore-<UTC-ISO>/ first so nothing is lost. All three are volume
+# mounts, so it is their contents that move and not the directories.
 #
 
 set -eu
@@ -21,8 +19,8 @@ if [ -z "${RESTIC_HOST:-}" ]; then
     exit 1
 fi
 
-# Preflight before moving anything aside: a bad credential or unreachable
-# repo must fail here, not after the working data has been archived.
+# Checked before anything is moved aside, so a bad credential or an unreachable
+# repo fails here rather than after the working data has been archived.
 if ! restic cat config >/dev/null; then
     echo "ERROR: cannot open restic repository $RESTIC_REPOSITORY" >&2
     exit 1
@@ -41,7 +39,7 @@ for dir in .claude code .ssh; do
 done
 
 echo "Restoring latest snapshot from $RESTIC_REPOSITORY"
-# --host: desktop and laptop share this repo; a bare `latest` would restore
+# desktop and laptop share this repo, so a bare `latest` would restore
 # whichever machine backed up most recently.
 restic restore latest --host="$RESTIC_HOST" --target /
 

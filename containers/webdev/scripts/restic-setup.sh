@@ -3,9 +3,9 @@
 # restic-setup.sh
 #
 # Check the restic credentials in ~/.restic, and walk through entering them if
-# they are missing or wrong. This exists so that setting up backups on a fresh
-# container is one command that tells you what it wants, rather than opening
-# two files in nvim and hoping the shape is right.
+# they are missing or wrong, so setting up backups on a fresh container is one
+# command that says what it wants rather than two files to open in nvim and
+# get subtly wrong.
 #
 #   restic-setup            check, then offer to fix whatever is wrong
 #   restic-setup --check    check only, quietly; exit 0 if backups will work
@@ -35,8 +35,6 @@ case "${1:-}" in
 *) echo "unknown option: $1" >&2; sed -n '2,22p' "$0" | sed 's/^#[[:space:]]\{0,1\}//' >&2; exit 2 ;;
 esac
 
-# ---------------------------------------------------------------- inspection
-
 # Everything below reads the current state without changing it, so the check
 # path and the interactive path agree on what is wrong.
 B2_ID=""
@@ -57,14 +55,10 @@ have_all_fields() {
     [ -n "$B2_ID" ] && [ -n "$B2_KEY" ] && [ -n "$HOSTTAG" ] && [ -s "$PW_FILE" ]
 }
 
-# The only check that actually proves anything: open the repository. Wrong key,
-# wrong password and no network all land here rather than being guessed at from
-# the shape of the files.
-#
-# Wrapped in a timeout because restic retries a failing backend about ten times
-# with backoff, so a revoked key takes minutes to come back rather than
-# seconds. `make doctor` calls this, and a doctor that hangs is worse than one
-# that is unsure. 124 is the timeout's own exit code.
+# Opening the repository is the only check that proves anything, since a wrong
+# key, a wrong password and no network all land here. Timed out because restic
+# retries a failing backend about ten times with backoff and `make doctor`
+# calls this. 124 is the timeout's own exit code.
 RESTIC_TIMEOUT=${RESTIC_TIMEOUT:-30}
 restic_probe() {
     B2_ACCOUNT_ID="$B2_ID" B2_ACCOUNT_KEY="$B2_KEY" \
@@ -81,8 +75,6 @@ if [ "$CHECK_ONLY" = yes ]; then
     repo_opens || exit 1
     exit 0
 fi
-
-# ------------------------------------------------------------------- report
 
 mask() {
     v=$1
@@ -131,8 +123,6 @@ if [ ! -t 0 ]; then
     exit 1
 fi
 
-# ------------------------------------------------------------------ where from
-
 cat <<'GUIDE'
 ------------------------------------------------------------------------
 where these come from
@@ -163,14 +153,9 @@ where these come from
 GUIDE
 echo ""
 
-# --------------------------------------------------------------- collecting
-
-# Enter keeps whatever is already there, so this is safe to re-run to change
-# one field without retyping the rest.
-#
-# These set a global rather than printing a value for $(...) to capture. Run
-# inside a command substitution the prompt is captured too, so the terminal
-# shows nothing and you are typing blind into what looks like a hung script.
+# Enter keeps whatever is already there, so one field can be changed without
+# retyping the rest. These set a global rather than printing a value, because
+# inside $(...) the prompt is captured too and you end up typing blind.
 ANSWER=""
 
 ask() {
@@ -195,7 +180,6 @@ ask_secret() {
 ask        "B2 keyID"          "$B2_ID";  NEW_ID=$ANSWER
 ask_secret "B2 applicationKey" "$B2_KEY"; NEW_KEY=$ANSWER
 
-# The tag that separates this machine's snapshots from the other one's.
 # Retention is applied per host, so a typo here quietly gives a third machine
 # its own 7/4/6 window and stops pruning the real one.
 while :; do
@@ -218,10 +202,8 @@ if [ -z "$NEW_ID" ] || [ -z "$NEW_KEY" ] || [ -z "$NEW_PW" ]; then
     exit 1
 fi
 
-# ------------------------------------------------------------------ writing
-
 # Written to a temp file and moved into place, so an interrupted run cannot
-# leave a half-written credentials file behind.
+# leave half a credentials file behind.
 mkdir -p "$RESTIC_DIR"
 chmod 700 "$RESTIC_DIR"
 
@@ -229,9 +211,8 @@ umask 077
 
 tmp="$B2_ENV.tmp.$$"
 cat > "$tmp" <<ENV
-# Written by restic-setup. Sourced by restic-backup, restic-restore and
-# restic-status. RESTIC_HOST is the snapshot tag that keeps this machine's
-# retention window separate from the other one's.
+# Written by restic-setup, sourced by restic-backup, restic-restore and
+# restic-status. RESTIC_HOST is this machine's snapshot tag.
 export B2_ACCOUNT_ID="$NEW_ID"
 export B2_ACCOUNT_KEY="$NEW_KEY"
 export RESTIC_HOST="$NEW_HOST"
@@ -247,8 +228,6 @@ mv "$tmp" "$PW_FILE"
 echo ""
 echo "wrote $B2_ENV and $PW_FILE (0600)"
 echo ""
-
-# -------------------------------------------------------------- verification
 
 B2_ID=$NEW_ID
 B2_KEY=$NEW_KEY

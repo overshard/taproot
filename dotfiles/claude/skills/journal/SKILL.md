@@ -17,7 +17,7 @@ or done halfway.
 - **After each meaningful unit of work**, not only at session end: a task or subtask
   wrapping, a notable decision, a commit or deploy, or a real discussion (including
   non-engineering: a question answered, a topic thought through, a preference
-  expressed). Capture it while fresh; do not batch the whole session into one entry.
+  expressed). Capture it while fresh and do not batch the whole session into one entry.
 
 ## The vault
 
@@ -44,8 +44,8 @@ index.md   master retrieval map: one line per note
    state changed or a notable choice was settled. Create a new note when a durable topic
    or decision emerges.
 3. **Update `index.md`** whenever a note is *added* (one line: `- [[slug]]: one-line hook`).
-4. Capture **why**, not just what; the diff and code already record what. Link related
-   notes liberally with `[[wikilinks]]` (filename without extension); a link to a
+4. Capture **why**, not just what, since the diff already records what. Link related
+   notes liberally with `[[wikilinks]]` (filename without extension), since a link to a
    not-yet-written note is fine, it marks something worth writing later.
 5. **Commit** (no `Co-Authored-By` trailer, present tense, `memory:` prefix):
 
@@ -55,7 +55,7 @@ index.md   master retrieval map: one line per note
 
 ## Conventions
 
-- No em dashes or en dashes in prose; use commas, periods, colons, or parentheses.
+- No em dashes, en dashes or semicolons. Use commas, periods, or parentheses.
 - Frontmatter on every note: `title`, `type` (journal|project|decision|topic|person),
-  `created`, `updated`, `tags`. Filenames lowercase kebab-case; journals `YYYY-MM-DD.md`.
+  `created`, `updated`, `tags`. Filenames lowercase kebab-case, journals `YYYY-MM-DD.md`.
 - Convert relative dates ("next week") to absolute dates when recording.

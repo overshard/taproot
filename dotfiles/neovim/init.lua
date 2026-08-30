@@ -7,8 +7,6 @@ vim.api.nvim_set_hl(0, "Normal", { bg = "#0e0d0a" })
 vim.api.nvim_set_hl(0, "NormalFloat", { bg = "#13120e" })
 
 
--- Statusline
-
 vim.opt.laststatus = 2
 vim.opt.showmode = false
 

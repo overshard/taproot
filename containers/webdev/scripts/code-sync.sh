@@ -2,19 +2,13 @@
 #
 # code-sync.sh
 #
-# Two-pass sync for the ~/code/ workspace.
+# Two passes over ~/code/. First, pull from origin for every git repo already
+# there, skipping any that is dirty or on a detached HEAD, and using --ff-only
+# so a divergent branch never gets a silent merge or rebase.
 #
-# 1) Pull latest from origin for every git repo already under ~/code/. Skips
-#    repos with uncommitted changes or detached HEAD. Uses --ff-only so a
-#    divergent branch never gets a silent merge or rebase.
-#
-# 2) Hit the public GitHub API for $GITHUB_USER (overshard) and clone any
-#    non-archived, non-fork, owned repos that don't exist locally yet, using
-#    the SSH key configured globally in ~/.ssh/config (no auth needed for the
-#    API call; this is one request per run, well under the 60/hr unauth
-#    rate limit).
-#
-# Run after switching machines (e.g. desktop -> laptop) to catch up.
+# Second, ask the public GitHub API for $GITHUB_USER's repos and clone any
+# non-archived, non-fork, owned one that is not here yet. The API call needs no
+# auth and the clone uses the key from ~/.ssh/config.
 #
 
 set -u

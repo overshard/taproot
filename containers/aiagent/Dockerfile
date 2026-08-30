@@ -2,12 +2,12 @@
 #
 # Qwen3.5-9B at 128k context on a llama.cpp CUDA server, plus the pi coding
 # agent pointed at it. Sized for an 8GB Ampere card. No telemetry, no update
-# checks, no published port. It has no toolchain of its own: this runs an agent,
-# it does not build. What it needs to compile with, it borrows from webdev
-# through the mounted docker socket. See scripts/webdev-exec.sh.
+# checks, no published port. It has no toolchain of its own and borrows what it
+# needs to compile from webdev over the mounted docker socket, see
+# scripts/webdev-exec.sh.
 #
 # Commands are one line each so they paste into PowerShell and sh alike. Run
-# them from a clone of this repo; the build needs it as context.
+# them from a clone of this repo, which the build needs as context.
 #
 # Build or rebuild (~15 min the first time):
 #     docker build --tag overshard/aiagent:latest -f containers/aiagent/Dockerfile .
@@ -30,10 +30,9 @@
 #
 # Gotchas: --gpus all or it loads nothing. --init or tmux leaves zombies. The
 # server binds loopback and publishes nothing, so only pi in here reaches it and
-# it needs no API key; that is also why the weights volume is the only state.
-# Weights plus a 128k q4_0 KV cache sit at about 96% of an 8GB card, so a second
-# CUDA process will not fit alongside it. Reaching the docker socket is host
-# root, which is the price of letting the agent verify its own work.
+# it needs no API key. Weights plus a 128k q4_0 KV cache very nearly fill an 8GB
+# card, so a second CUDA process will not fit alongside them. Anything that
+# reaches the docker socket is root on the host.
 
 
 FROM debian:trixie-slim AS build
@@ -86,9 +85,9 @@ ENV DEBIAN_FRONTEND=noninteractive \
     LLAMA_CACHE=/models \
     PATH=/home/ai/scripts:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 
-# Node, not bun: pi's extension installer shells out to `npm root -g`.
-# The Docker CLI is the client only, never the daemon: it reaches webdev, which
-# is where this container's build tools live. Docker's own repo, not Debian's.
+# Node, not bun, because pi's extension installer shells out to `npm root -g`.
+# The Docker CLI is the client only and reaches webdev, where the build tools
+# are. From Docker's own repo, not Debian's.
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
         ca-certificates curl git openssh-client jq tmux less nano procps sudo \
@@ -116,10 +115,9 @@ COPY --from=build /tmp/build/bin/llama-server /tmp/build/bin/llama-bench /usr/lo
 RUN printf 'export PATH=/home/ai/scripts:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin\n' \
         > /etc/profile.d/10-path.sh
 
-# UID 1001 matches webdev's dev user so both share the bythewood-code volume.
-# The sudo rule exists only so the wrappers can reach the root:root 660 socket.
-# Narrowing it to the docker client is tidiness, not security: anything that
-# reaches the daemon is root on the host.
+# UID 1001 matches webdev's dev user so both share the bythewood-code volume,
+# and the sudo rule is there so the wrappers can reach the root:root 660 socket.
+#
 # pi fetches its own rg and fd into .pi/agent/bin on first run, which offline
 # mode blocks, so link the packaged ones where it looks for them.
 RUN useradd -m -u 1001 -s /bin/bash ai && \
@@ -144,10 +142,9 @@ You have `read`, `bash`, `edit`, `write`, and web tools: `web_search`,
 when a fact can be looked up.
 
 `go`, `gofmt` and `bun` are on your PATH. They run in another container against
-these same files; you do not need to know how, and there is nothing to set up.
-Use them as you would anywhere. If that container is not running they print
-what to do and exit non-zero: pass the message on and do not claim the code
-builds.
+these same files and there is nothing for you to set up, so use them as you
+would anywhere. If that container is not running they print what to do and exit
+non-zero, so pass the message on and do not claim the code builds.
 
 Never run a command that does not exit on its own. No dev servers, no watch
 modes, no `bun run dev`, no `make run`. They hang and the work stops there.
@@ -156,11 +153,11 @@ Only `~/code` is shared. Build from inside it.
 
 ## Not every task is a coding task
 
-Work out what you were actually asked for before you start. Plenty of it is a
-question, a lookup or a piece of research with no code in it at all. If you
-changed no files then there is nothing to build: answer with what you found,
-and name the sources you read. Everything below applies once you have written
-or edited code, and not before.
+Work out what you were actually asked for before you start, since plenty of it
+is a question, a lookup or a piece of research with no code in it at all. If you
+changed no files then there is nothing to build, so answer with what you found
+and name the sources you read. Everything below applies once you have written or
+edited code.
 
 ## Before adding any dependency
 
@@ -187,18 +184,17 @@ resolve content hashed filenames.
 
 ## Definition of done
 
-If you changed code: `go build ./...` and `go vet ./...` both exit zero, and
-the frontend builds. Run them. Do not report success without running them. A
-program that compiles but serves a blank page is not done.
+If you changed code, `go build ./...` and `go vet ./...` both have to exit zero
+and the frontend has to build. Run them and do not report success without
+running them, since a program that compiles but serves a blank page is not done.
 
-If a tool would not run, say so plainly and say what is unverified. A change
-nobody compiled is not a finished change.
+If a tool would not run, say so plainly and say what is unverified.
 AGENTS
-# extended-keys lets pi see modified Enter. Appended rather than added to the
-# shared dotfile so webdev's tmux is untouched.
-# One script under three names, dispatching on its own argv[0]. A 9B follows
-# `go build ./...` and will not reliably assemble a docker exec, so none of the
-# arrangement has to fit in the model's head.
+# extended-keys lets pi see modified Enter, appended here rather than added to
+# the shared dotfile so webdev's tmux is untouched.
+#
+# One script under three names, dispatching on its own argv[0], so the agent
+# runs a plain `go build ./...` and never has to assemble a docker exec.
 RUN chown ai:ai /home/ai/.bash_aliases /home/ai/.tmux.conf && \
     for f in /home/ai/scripts/*.sh; do mv "$f" "${f%.sh}"; done && \
     chmod +x /home/ai/scripts/* && \

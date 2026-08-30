@@ -6,13 +6,8 @@
 #   make update      rebuild the image and replace the running container
 #   make doctor      what exists, what is running, what to type
 #
-# Both take C= to pick a container. It defaults to webdev, which is the one you
-# live in:
-#
-#   make up C=aiagent
-#   make update C=aiagent
-#
-# And the rest:
+# Add C=aiagent to any target, it defaults to webdev, which is the one you live
+# in. And the rest:
 #
 #   make shell       attach via tmux
 #   make stop        stop it without replacing anything
@@ -66,12 +61,8 @@ help:
 	@echo ""
 	@echo "a machine that has never run this: make up, then follow what doctor says"
 
-# ---------------------------------------------------------------- the system
-
-# Idempotent, and the repair command as much as the first-run command. Creates
-# the volumes, builds the image if it is not there, creates the container if it
-# is not there, starts it if it is stopped, and leaves it alone if it is fine.
-# It never replaces a running container; that is `update`.
+# Idempotent, so it repairs as readily as it installs. It never replaces a
+# running container, that is what `update` is for.
 up: require-container
 	for v in $(VOLUMES); do $(DOCKER) volume create $$v >/dev/null; done
 	$(DOCKER) image inspect $(IMAGE) >/dev/null 2>&1 || \
@@ -86,20 +77,12 @@ up: require-container
 	@echo ""
 	$(MAKE) --no-print-directory doctor
 
-# Rebuild, then replace. The build happens first and does not touch the running
-# container, so only the last couple of seconds are disruptive.
-#
-# Replacing webdev FROM INSIDE webdev cannot be done directly: `docker rm
-# --force` on your own container kills the make process doing the removing, so
-# the `docker run` that should follow never happens and you are left with no
-# container at all. A throwaway docker:cli does the swap instead. It is a
-# separate container, so webdev dying does not take it with it, and it runs as
-# root, so it needs no sudo of its own.
+# Replacing webdev from inside webdev cannot be done directly: `docker rm
+# --force` on your own container kills the make doing the removing, so the
+# `docker run` after it never happens. A throwaway docker:cli survives that.
 #
 # Nothing below may contain $$(MAKE). GNU make runs any recipe line carrying
-# that string even under `-n`, and because the whole swap is one shell
-# conditional, a single `$$(MAKE) doctor` tacked on the end turned `make -n
-# update` into a real container replacement. Ask for doctor by name instead.
+# that string even under `-n`, so a dry run would really replace the container.
 update: require-container
 	$(DOCKER) build --tag $(IMAGE) -f containers/$(C)/Dockerfile .
 	@self=$$(cat /etc/hostname 2>/dev/null); \
@@ -187,9 +170,8 @@ dotfiles:
 		 ln -snf /home/dev/code/taproot/dotfiles/claude/status-line.sh /home/dev/.claude/status-line.sh"
 	echo "claude skills and status line linked"
 
-# The only step that reaches Hugging Face; weights land in the volume. Starts
-# the server with offline disabled, waits for it to come up, then tears it
-# down. --list-devices does not work here: it exits before -hf is resolved.
+# The only step that reaches Hugging Face, weights land in the volume.
+# --list-devices cannot stand in for this, it exits before -hf is resolved.
 models:
 	-$(DOCKER) rm --force aiagent-fetch
 	$(DOCKER) run --detach --name aiagent-fetch --gpus all \
