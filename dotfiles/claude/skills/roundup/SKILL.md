@@ -1,6 +1,6 @@
 ---
 name: roundup
-description: Fast, spin-stripped news + markets briefing for Isaac, delivered as a diff since the last roundup. Invoke when Isaac says "roundup", asks "what's new / what did I miss", or wants a quick news/markets catch-up. Fans out across the political spectrum (NPR/BBC/CNN/Fox/Google News/AP/Reuters), market data (indexes/crypto/commodities), local NC, work-talk sports (NASCAR/F1/soccer), PC gaming (big releases + hyped indies), and watercooler feeds (Hacker News); filters hard to only what matters; reads the previous roundup from code/memory/roundups/ to report only what changed, then saves and commits the new one.
+description: Fast, spin-stripped news + markets briefing for Isaac, delivered as a diff since the last roundup. Invoke when Isaac says "roundup", asks "what's new / what did I miss", or wants a quick news/markets catch-up. Fans out across the political spectrum (NPR/BBC/CNN/Fox/Google News/AP/Reuters), market data (indexes/crypto/commodities), local NC, work-talk sports (NASCAR/F1/soccer), PC gaming (big releases + hyped indies), and watercooler feeds (Hacker News), filters hard to only what matters, and reads the previous roundup from code/memory/roundups/ to report only what changed, then saves and commits the new one.
 ---
 
 # Roundup: spin-stripped news + markets, as a diff
@@ -26,7 +26,7 @@ Cross-source corroboration is the importance test: if NPR + BBC + Fox + Google a
 with it, it is real and important. If only one outlet has it and it is not local to him,
 it is probably not worth a line.
 
-**Sports caveat.** Isaac does not personally care about sports; he tracks them only to
+**Sports caveat.** Isaac does not personally care about sports, he tracks them only to
 talk with coworkers. Coworkers follow **NASCAR, F1, and soccer ("football", the World Cup
 included)**. So the sports section is small and tuned to exactly those three: latest
 result, next event, any standings shift. Skip US "football", MLB, NBA, etc. unless a
@@ -60,9 +60,9 @@ baseline, mark nothing as a diff.
 ### Step 1 — fan out (one message, parallel `Agent` calls)
 
 Give every subagent: the current time, the prior timestamp, the keep/drop filter above,
-the spin-strip rule, and "report only what changed since <prior timestamp>; flag each item
+the spin-strip rule, and "report only what changed since <prior timestamp>, flag each item
 [NEW] or [DEV]." Suggested clusters and good fast sources (these are RSS/JSON feeds: clean
-headlines, no partisan article body; fetch with WebFetch, fall back to WebSearch or Google
+headlines, no partisan article body. Fetch with WebFetch, fall back to WebSearch or Google
 News RSS if one is down):
 
 1. **World + US + politics** (the core cross-spectrum strip)
@@ -72,24 +72,24 @@ News RSS if one is down):
    - Fox latest: `https://moxie.foxnews.com/google-publisher/latest.xml`
    - Google News top: `https://news.google.com/rss` (and AP/Reuters surface here for a neutral anchor)
 2. **Markets** (capture exact numbers for the diff)
-   - Indexes (S&P 500, Nasdaq, Dow): WebSearch "S&P 500 Nasdaq Dow today" for current level + day %; reliable.
+   - Indexes (S&P 500, Nasdaq, Dow): WebSearch "S&P 500 Nasdaq Dow today" for current level + day %, reliable.
    - Crypto (BTC, ETH): `https://api.coingecko.com/api/v3/simple/price?ids=bitcoin,ethereum&vs_currencies=usd&include_24hr_change=true` (fast, no key).
    - Commodities (gold, WTI crude): WebSearch "gold price WTI crude oil today".
    - One line on *why* the tape moved (Fed, CPI, earnings, geopolitics).
 3. **Local NC** (Yadkin Valley / Elkin / Jonesville / Surry & Wilkes counties, NC statewide if big)
    - WebSearch "Elkin NC news", "Yadkin Valley news", "North Carolina news today". Weather only if severe (Isaac has had storm power outages).
 4. **Sports for work talk** (NASCAR, F1, soccer/World Cup ONLY)
-   - ESPN F1: `https://www.espn.com/espn/rss/rpm/news`, ESPN soccer: `https://www.espn.com/espn/rss/soccer/news`; NASCAR via WebSearch "NASCAR Cup last race result next race". Latest result + next event + any standings shift, one line each.
-5. **Gaming** (PC gaming, big releases/announcements, hyped indies; Isaac plays PC and tracks what's new and hyped)
+   - ESPN F1: `https://www.espn.com/espn/rss/rpm/news`, ESPN soccer: `https://www.espn.com/espn/rss/soccer/news`, NASCAR via WebSearch "NASCAR Cup last race result next race". Latest result + next event + any standings shift, one line each.
+5. **Gaming** (PC gaming, big releases/announcements, hyped indies, Isaac plays PC and tracks what's new and hyped)
    - PC Gamer: `https://www.pcgamer.com/rss/`, Rock Paper Shotgun: `https://www.rockpapershotgun.com/feed`, Eurogamer: `https://www.eurogamer.net/feed`, IGN games: `https://feeds.feedburner.com/ign/games-all`.
-   - Steam: `https://store.steampowered.com/feeds/news.xml`; WebSearch "Steam top sellers this week" and "most wishlisted Steam games" for what's actually hyped right now.
+   - Steam: `https://store.steampowered.com/feeds/news.xml`, plus WebSearch "Steam top sellers this week" and "most wishlisted Steam games" for what's actually hyped right now.
    - KEEP: notable new releases and firm release dates, major studio/industry news (acquisitions, engine/platform shifts, big game-changing patches), and genuinely hyped indie games (strong wishlist/early-access buzz, breakout launches). DROP: console-exclusive minutiae Isaac can't play on PC, mobile/gacha, esports match scores, routine patch notes, and review-score churn. A few bullets max, one neutral line each + (sources).
 6. **Watercooler** (Hacker News only, genuinely notable items)
    - Hacker News front page: `https://hnrss.org/frontpage` (or `https://hacker-news.firebaseio.com/v0/topstories.json`). Surface only items with real signal (a major outage, a tech/industry shift, a story the mainstream feeds missed), not memes.
-   - Reddit is intentionally NOT used. Tested 2026-06-27: Reddit blocks this container's datacenter IP at the network level (403/429 + "blocked by network security") on the JSON API, the `.rss` feed, old.reddit, and a full headless Chromium with a spoofed browser UA. The block is IP-based, so neither a user-agent nor a real browser bypasses it. The only working path would be the authenticated OAuth API (client_id/secret), which we have not set up. Do not waste a fetch attempt on Reddit; r/news and r/worldnews largely duplicate the mainstream feeds anyway.
+   - Reddit is intentionally NOT used. Tested 2026-06-27: Reddit blocks this container's datacenter IP at the network level (403/429 + "blocked by network security") on the JSON API, the `.rss` feed, old.reddit, and a full headless Chromium with a spoofed browser UA. The block is IP-based, so neither a user-agent nor a real browser bypasses it. The only working path would be the authenticated OAuth API (client_id/secret), which we have not set up. Do not waste a fetch attempt on Reddit, since r/news and r/worldnews largely duplicate the mainstream feeds anyway.
 
 Scale the fan-out to the ask: a quick "what'd I miss" can be 3 agents (news+politics,
-markets, sports); a fuller catch-up after days away uses all six. Drop a cluster Isaac
+markets, sports), and a fuller catch-up after days away uses all six. Drop a cluster Isaac
 says he does not want.
 
 ### Step 2 — merge and diff

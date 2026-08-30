@@ -7,7 +7,7 @@ description: Drive a real browser for screenshots, page inspection, and UI verif
 
 We use Microsoft's `playwright-cli` (the `@playwright/cli` package) instead of the
 Playwright MCP server. The MCP streams the full accessibility tree and screenshot bytes
-into context on every step (~4x the tokens); the CLI writes that state to disk and lets
+into context on every step (~4x the tokens). The CLI writes that state to disk and lets
 you read only the snapshot lines you need. Same browser, far cheaper context.
 
 The webdev container already ships Playwright Chromium at `/opt/playwright-browsers`
@@ -42,9 +42,9 @@ not guess refs.
 ## Where output lands
 
 - Snapshots: `.playwright-cli/page-<timestamp>.yml` (the accessibility tree with refs).
-- Screenshots: PNG files on disk; open them with the Read tool to view.
+- Screenshots: PNG files on disk, opened with the Read tool to view.
 
-Read these files on demand rather than dumping them; that is the entire point of using
+Read these files on demand rather than dumping them, which is the reason for using
 the CLI over the MCP.
 
 ## Notes for this workspace

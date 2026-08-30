@@ -16,23 +16,13 @@ set -u
 
 . "$HOME/.restic/b2-env"
 
-# Strip RESTIC_REPOSITORY/RESTIC_PASSWORD_FILE from any inherited env so we
-# can set them per-repo below.
+# Cleared out of any inherited env so show_repo can set them per repo.
 unset RESTIC_REPOSITORY
 unset RESTIC_PASSWORD_FILE
 
-# RESTIC_HOST has to go too, and it is the one that actually bit. b2-env
-# exports it for restic-backup's --host tag, but restic honours RESTIC_HOST as
-# the --host *filter* on read commands, so sourcing b2-env silently filtered
-# every query below to whichever machine was running the script.
-#
-# That made this tool lie in two directions at once. The alpine repo reported
-# "Total Size: 0 B" with no snapshots, because the Linode's snapshots are
-# hostname "alpinelinux" and never "desktop", so the 1.71GB of backup history
-# that survived the box being cancelled looked like it did not exist. And
-# "Latest snapshot per host" only ever showed the host you were sitting at,
-# despite --group-by host, so the laptop's snapshots were invisible from the
-# desktop and vice versa.
+# RESTIC_HOST has to go too. b2-env exports it for restic-backup's --host tag,
+# but restic also honours it as the --host filter on read commands, so leaving
+# it set quietly limits every query below to the machine running this script.
 unset RESTIC_HOST
 
 NOW=$(date -u +'%Y-%m-%d %H:%M:%S UTC')
