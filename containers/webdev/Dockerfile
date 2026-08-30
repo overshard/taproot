@@ -1,6 +1,6 @@
 # webdev
 #
-# Debian 13. Go, Python (uv), Bun, Claude Code, Docker CLI, typst, Playwright.
+# Debian 13. Go, Python (uv), Bun, Claude Code, Docker CLI, gh, typst, Playwright.
 # No nodejs, no npm, no Rust. Work lives in the four bythewood-* volumes, so the
 # container itself is disposable.
 #
@@ -87,6 +87,18 @@ RUN curl -fsSL -o /tmp/typst.tar.xz \
     mv /tmp/typst-x86_64-unknown-linux-musl/typst /usr/local/bin/typst && \
     rm -rf /tmp/typst.tar.xz /tmp/typst-x86_64-unknown-linux-musl && \
     typst --version
+
+# Debian does not package gh, and GitHub's apt repo would be a second keyring
+# for one binary.
+ARG GH_VERSION=2.98.0
+ARG GH_SHA256=3b8ac6b30336802fc1a858d7c084e11cdf24ac1a761ca90b68022d7d729208de
+RUN curl -fsSL -o /tmp/gh.tar.gz \
+      "https://github.com/cli/cli/releases/download/v${GH_VERSION}/gh_${GH_VERSION}_linux_amd64.tar.gz" && \
+    echo "${GH_SHA256}  /tmp/gh.tar.gz" | sha256sum -c - && \
+    tar -xzf /tmp/gh.tar.gz -C /tmp && \
+    mv "/tmp/gh_${GH_VERSION}_linux_amd64/bin/gh" /usr/local/bin/gh && \
+    rm -rf /tmp/gh.tar.gz "/tmp/gh_${GH_VERSION}_linux_amd64" && \
+    gh --version
 
 # The pin matters. 0.1.14 drives a page, while 0.1.18 and unpinned both die with
 # "No usable sandbox" under Docker Desktop on WSL2, so drive a real page after

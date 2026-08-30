@@ -107,7 +107,7 @@ Both containers are Debian 13, both run as UID 1001, and both mount
 | | `webdev` | `aiagent` |
 |---|---|---|
 | For | writing and building | running a local coding agent |
-| Toolchains | Go, uv, Bun, typst, Docker CLI, Playwright | none of its own; borrows webdev's |
+| Toolchains | Go, uv, Bun, typst, Docker CLI, gh, Playwright | none of its own; borrows webdev's |
 | GPU | no | `--gpus all`, required |
 | Publishes | 8000, for dev servers | nothing |
 | Image | 3.5 GB | 2.2 GB |
