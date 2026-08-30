@@ -14,7 +14,6 @@
 #
 #   ~/.restic/b2-env           B2_ACCOUNT_ID, B2_ACCOUNT_KEY, RESTIC_HOST
 #   ~/.restic/password         password for the webdev repo
-#   ~/.restic/alpine-password  password for the old server's repo (optional)
 #
 # --check is what `make doctor` in taproot calls, so keep it silent and keep
 # its exit code meaningful.
@@ -24,15 +23,14 @@ set -eu
 RESTIC_DIR="$HOME/.restic"
 B2_ENV="$RESTIC_DIR/b2-env"
 PW_FILE="$RESTIC_DIR/password"
-ALPINE_PW_FILE="$RESTIC_DIR/alpine-password"
 REPO="b2:overshard-backups:webdev"
 
 CHECK_ONLY=no
 case "${1:-}" in
 --check) CHECK_ONLY=yes ;;
---help|-h) sed -n '2,22p' "$0" | sed 's/^#[[:space:]]\{0,1\}//'; exit 0 ;;
+--help|-h) sed -n '2,19p' "$0" | sed 's/^#[[:space:]]\{0,1\}//'; exit 0 ;;
 "") ;;
-*) echo "unknown option: $1" >&2; sed -n '2,22p' "$0" | sed 's/^#[[:space:]]\{0,1\}//' >&2; exit 2 ;;
+*) echo "unknown option: $1" >&2; sed -n '2,19p' "$0" | sed 's/^#[[:space:]]\{0,1\}//' >&2; exit 2 ;;
 esac
 
 # Everything below reads the current state without changing it, so the check
@@ -91,7 +89,6 @@ printf '  %-18s %s\n' "B2_ACCOUNT_ID"  "$(mask "$B2_ID")"
 printf '  %-18s %s\n' "B2_ACCOUNT_KEY" "$(mask "$B2_KEY")"
 printf '  %-18s %s\n' "RESTIC_HOST"    "${HOSTTAG:-not set}"
 printf '  %-18s %s\n' "repo password"  "$([ -s "$PW_FILE" ] && echo set || echo 'not set')"
-printf '  %-18s %s\n' "alpine password" "$([ -s "$ALPINE_PW_FILE" ] && echo set || echo 'not set, optional')"
 echo ""
 
 if have_all_fields; then
