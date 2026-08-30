@@ -158,10 +158,9 @@ The webdev container backs up to a Backblaze B2 bucket (`overshard-backups`)
 using restic. Retention is 7 daily, 4 weekly and 6 monthly per host, pruned
 after each backup. Passwords and B2 keys live in 1Password.
 
-| Repository | What's in it |
-|---|---|
-| `b2:overshard-backups:webdev` | Per-machine snapshots from desktop and laptop (`~/.claude`, `~/code`, `~/.ssh`), tagged with `$RESTIC_HOST` |
-| `b2:overshard-backups:alpine` | Historical only. Daily snapshots from the cancelled server; nothing writes to it any more |
+There is one repository, `b2:overshard-backups:webdev`, holding per-machine
+snapshots of `~/.claude`, `~/code` and `~/.ssh` from desktop and laptop, each
+tagged with `$RESTIC_HOST`.
 
 `restic-setup` is the way in. It reports what is set, verifies it by actually
 opening the repository, prompts for anything missing, and writes both files at
@@ -169,7 +168,7 @@ opening the repository, prompts for anything missing, and writes both files at
 
 ```sh
 restic-backup   # take a snapshot from this machine
-restic-status   # check both repos from anywhere
+restic-status   # check the repo from anywhere
 restic-restore  # existing data moves to ~/before-restore-<UTC>/ first
 ```
 
