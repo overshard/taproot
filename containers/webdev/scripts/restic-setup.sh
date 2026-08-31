@@ -7,16 +7,17 @@
 # command that says what it wants rather than two files to open in nvim and
 # get subtly wrong.
 #
-#   restic-setup            check, then offer to fix whatever is wrong
-#   restic-setup --check    check only, quietly; exit 0 if backups will work
+#   restic-setup             check, then offer to fix whatever is wrong
+#   restic-setup --check     check only, quietly; exit 0 if backups will work
+#   restic-setup --password  print a suggested password and exit, writing nothing
 #
 # The files it manages, all in the bythewood-restic volume:
 #
 #   ~/.restic/b2-env           B2_ACCOUNT_ID, B2_ACCOUNT_KEY, RESTIC_HOST
 #   ~/.restic/password         password for the webdev repo
 #
-# --check is what `make doctor` in taproot calls, so keep it silent and keep
-# its exit code meaningful.
+# From a taproot clone this is `make restic`, and --check is what `make doctor`
+# calls, so keep it silent and keep its exit code meaningful.
 
 set -eu
 
@@ -25,12 +26,33 @@ B2_ENV="$RESTIC_DIR/b2-env"
 PW_FILE="$RESTIC_DIR/password"
 REPO="b2:overshard-backups:webdev"
 
+# Reads the header above rather than a line range, so editing the comment cannot
+# silently turn --help into someone else's text.
+usage() {
+    awk 'NR>1 && /^#/ { sub(/^#[ ]?/, ""); print; next } NR>1 { exit }' "$0"
+}
+
+# 32 characters of /dev/urandom in groups of eight. Long enough that nobody is
+# ever going to type it by hand, grouped so it can be read back off a screen.
+gen_password() {
+    LC_ALL=C tr -dc 'A-Za-z0-9' < /dev/urandom \
+        | head -c 32 \
+        | sed 's/.\{8\}/&-/g; s/-$//'
+    echo ""
+}
+
 CHECK_ONLY=no
 case "${1:-}" in
 --check) CHECK_ONLY=yes ;;
---help|-h) sed -n '2,19p' "$0" | sed 's/^#[[:space:]]\{0,1\}//'; exit 0 ;;
+--password)
+    # The password alone on stdout and the note on stderr, so it pipes cleanly.
+    gen_password
+    echo "" >&2
+    echo "a suggestion, nothing was written. put it in 1Password." >&2
+    exit 0 ;;
+--help|-h) usage; exit 0 ;;
 "") ;;
-*) echo "unknown option: $1" >&2; sed -n '2,19p' "$0" | sed 's/^#[[:space:]]\{0,1\}//' >&2; exit 2 ;;
+*) echo "unknown option: $1" >&2; usage >&2; exit 2 ;;
 esac
 
 # Everything below reads the current state without changing it, so the check
@@ -98,8 +120,8 @@ if have_all_fields; then
         echo ""
         echo "backups are working. nothing to do here."
         echo ""
-        echo "  restic-backup    take a snapshot from this machine"
-        echo "  restic-status    last snapshot per host, both repos"
+        echo "  make backup      take a snapshot from this machine"
+        echo "  make snapshots   last snapshot per host, and what the repo costs"
         exit 0
     fi
     echo "FAILED"
@@ -116,7 +138,7 @@ echo ""
 if [ ! -t 0 ]; then
     echo "this needs a terminal to read the values. run it as:" >&2
     echo "" >&2
-    echo "  docker exec -it bythewood-webdev restic-setup" >&2
+    echo "  make restic" >&2
     exit 1
 fi
 
@@ -191,7 +213,30 @@ done
 
 CURRENT_PW=""
 [ -s "$PW_FILE" ] && CURRENT_PW=$(cat "$PW_FILE")
-ask_secret "restic repository password" "$CURRENT_PW"; NEW_PW=$ANSWER
+
+# A generated one only works for a repository that does not exist yet, and the
+# second machine has to be given the first one's password instead, so it is
+# offered rather than just written.
+SUGGESTED=""
+if [ -n "$CURRENT_PW" ]; then
+    ask_secret "restic repository password" "$CURRENT_PW"; NEW_PW=$ANSWER
+else
+    SUGGESTED=$(gen_password)
+    echo ""
+    echo "there is no repo password here yet, so here is one:"
+    echo ""
+    echo "    $SUGGESTED"
+    echo ""
+    echo "press enter to take it, and put it in 1Password now, because it is"
+    echo "not recoverable and nothing else has a copy. if this machine is"
+    echo "joining backups that already exist, paste that repository's own"
+    echo "password over it instead, since a new one will not open it."
+    echo ""
+    printf 'restic repository password [enter takes the one above]: '
+    read -r ANSWER || ANSWER=""
+    NEW_PW=${ANSWER:-$SUGGESTED}
+    [ "$NEW_PW" = "$SUGGESTED" ] || SUGGESTED=""
+fi
 
 if [ -z "$NEW_ID" ] || [ -z "$NEW_KEY" ] || [ -z "$NEW_PW" ]; then
     echo "" >&2
@@ -224,6 +269,15 @@ mv "$tmp" "$PW_FILE"
 
 echo ""
 echo "wrote $B2_ENV and $PW_FILE (0600)"
+
+if [ -n "$SUGGESTED" ]; then
+    echo ""
+    echo "the generated password, one last time, since this is the last screen"
+    echo "that will ever show it:"
+    echo ""
+    echo "    $SUGGESTED"
+fi
+
 echo ""
 
 B2_ID=$NEW_ID
@@ -236,9 +290,9 @@ if repo_opens; then
     echo ""
     echo "backups are set up. next:"
     echo ""
-    echo "  restic-backup     take a snapshot from this machine"
-    echo "  restic-restore    pull everything back, on a fresh container"
-    echo "  restic-status     last snapshot per host, both repos"
+    echo "  make backup      take a snapshot from this machine"
+    echo "  make restore     pull everything back, on a fresh container"
+    echo "  make snapshots   last snapshot per host, and what the repo costs"
     exit 0
 fi
 
@@ -249,7 +303,8 @@ echo "how often it is the cause:"
 echo ""
 echo "  the applicationKey is wrong, or was revoked in the B2 console"
 echo "  the key is not scoped to the overshard-backups bucket"
-echo "  the repo password is wrong"
+echo "  the repo password is wrong, which a generated one will be if the"
+echo "    repository already existed"
 echo "  no network out of this container"
 echo ""
 echo "(it gives up after ${RESTIC_TIMEOUT}s. set RESTIC_TIMEOUT to wait longer.)"

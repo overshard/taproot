@@ -6,27 +6,21 @@
 # needs to compile from webdev over the mounted docker socket, see
 # scripts/webdev-exec.sh.
 #
-# Commands are one line each so they paste into PowerShell and sh alike. Run
-# them from a clone of this repo, which the build needs as context.
+# Everything is a make target in the Makefile at the root of this repo, which is
+# also the build context, so run these from a clone. C=aiagent picks this
+# container, since the targets default to webdev:
 #
-# Build or rebuild (~15 min the first time):
-#     docker build --tag overshard/aiagent:latest -f containers/aiagent/Dockerfile .
+#     make build C=aiagent    build or rebuild, about 15 minutes the first time
+#     make models             fetch the weights, the only step that reaches HF
+#     make up C=aiagent       create it and start it, safe to re-run
+#     make update C=aiagent   rebuild and replace a running one
+#     make shell C=aiagent    get in, then type: pi
+#     make stop C=aiagent     stop it, which frees the VRAM
 #
-# Fetch the weights once, the only step that reaches Hugging Face:
-#     make models
+# Serve a different model without rebuilding, as a one-off against the same
+# weights volume:
 #
-# Replace a running container with the new image:
-#     docker rm --force bythewood-aiagent
-#     docker run --detach --name bythewood-aiagent --init --gpus all --volume bythewood-code:/home/ai/code --volume bythewood-ssh:/home/ai/.ssh --volume bythewood-models:/models --volume /var/run/docker.sock:/var/run/docker.sock overshard/aiagent:latest
-#
-# Get in, then type: pi
-#     docker exec -it bythewood-aiagent tmux
-#
-# Stop, which frees the VRAM:
-#     docker stop bythewood-aiagent
-#
-# Serve a different model without rebuilding, by appending llama-server flags:
-#     docker run ... overshard/aiagent:latest -hf <repo>:<quant> --alias local
+#     make serve MODEL=<hf-repo>:<quant>
 #
 # Gotchas: --gpus all or it loads nothing. --init or tmux leaves zombies. The
 # server binds loopback and publishes nothing, so only pi in here reaches it and

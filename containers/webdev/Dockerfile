@@ -5,24 +5,19 @@
 # container itself is disposable.
 #
 # Driven by the Makefile at the root of this repo, which is also the build
-# context. From a clone:
+# context, and where every command lives. From a clone:
 #
-#     make up          create whatever is missing and start it; safe to re-run
+#     make up          create whatever is missing and start it, safe to re-run
 #     make update      rebuild this image and replace the running container
 #     make doctor      what exists, what is running, and what to type next
 #     make shell       get in, via tmux
 #
-# A machine that has never run this needs Docker, and a git key at
-# ~/.ssh/home_key that is on GitHub:
+# A machine that has never run this needs Docker and a git key at
+# ~/.ssh/home_key that is on GitHub, then one command:
 #
-#     make up
-#     docker cp $HOME/.ssh/home_key bythewood-webdev:/home/dev/.ssh/home_key
-#     docker exec bythewood-webdev sh -c "chmod 700 /home/dev/.ssh && chmod 600 /home/dev/.ssh/home_key"
-#     docker exec -it bythewood-webdev restic-setup
-#     docker exec -it bythewood-webdev restic-restore
+#     make install     the above, plus the key, the B2 credentials and a restore
 #
-# The 600 matters, ssh refuses anything looser and a key copied off Windows
-# arrives with no usable mode. `make doctor` reports on all of this.
+# `make help` lists the rest and `make doctor` reports on all of it.
 #
 # Gotchas: --init or tmux leaves zombies. docker.sock is root:root 660, so
 # docker needs sudo in here. --publish is what makes port 8000 reachable from

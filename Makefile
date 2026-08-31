@@ -1,17 +1,18 @@
 # taproot
 #
-# Three commands cover both containers:
+# Every operation is a make target, so nothing here needs a docker command typed
+# by hand. Three cover most days:
 #
 #   make up          create what is missing and start it; safe to re-run
 #   make update      rebuild the image and replace the running container
 #   make doctor      what exists, what is running, what to type
 #
-# Add C=aiagent to any target, it defaults to webdev, which is the one you live
-# in. And the rest:
+# A machine that has never run this wants `make install`, which is those plus
+# the three things no image can carry: the git key, the backup credentials, and
+# the data itself. `make help` lists everything else.
 #
-#   make shell       attach via tmux
-#   make stop        stop it without replacing anything
-#   make models      fetch the model weights once; needs the network
+# Add C=aiagent to any target, it defaults to webdev, which is the one you live
+# in.
 #
 # Run from a clone of this repo, which is the build context.
 #
@@ -23,11 +24,13 @@ DOCKER ?= $(SUDO) docker
 
 C ?= webdev
 REGISTRY ?= overshard
+KEY ?= $(HOME)/.ssh/home_key
 
 VOLUMES = bythewood-code bythewood-claude bythewood-ssh bythewood-restic bythewood-models
 
-NAME  = bythewood-$(C)
-IMAGE = $(REGISTRY)/$(C):latest
+NAME   = bythewood-$(C)
+IMAGE  = $(REGISTRY)/$(C):latest
+WEBDEV = bythewood-webdev
 
 RUN_webdev = --detach --name bythewood-webdev --init --restart unless-stopped \
 	--publish 8000:8000 \
@@ -46,20 +49,54 @@ RUN_aiagent = --detach --name bythewood-aiagent --init --gpus all \
 RUN_ARGS = $(RUN_$(C))
 
 .DEFAULT_GOAL := help
-.PHONY: help up update doctor shell stop models dotfiles require-container
+
+# install runs its prerequisites in order and a parallel make would not.
+.NOTPARALLEL:
+
+.PHONY: help install up update doctor shell build stop key restic password \
+	backup snapshots restore sync dotfiles models serve \
+	require-container require-webdev
 
 help:
+	@echo "make install        a machine that has never run this, start to finish"
 	@echo "make up             create what is missing and start it; safe to re-run"
 	@echo "make update         rebuild the image and replace the running container"
 	@echo "make doctor         what exists, what is running, what to type"
 	@echo ""
 	@echo "make shell          attach via tmux"
+	@echo "make build          build the image without touching the container"
 	@echo "make stop           stop it, without replacing anything"
+	@echo ""
+	@echo "make key            copy the git ssh key in from this machine"
+	@echo "make restic         enter or repair the B2 backup credentials"
+	@echo "make password       print a suggested password to paste into 1Password"
+	@echo ""
+	@echo "make backup         take a restic snapshot now"
+	@echo "make snapshots      last snapshot per host, and what the repo costs"
+	@echo "make restore        pull everything back from the latest snapshot"
+	@echo "make sync           pull every repo under ~/code, clone any new ones"
+	@echo ""
 	@echo "make models         fetch the model weights once; needs the network"
+	@echo "make serve MODEL=   run a different model without rebuilding"
 	@echo ""
-	@echo "add C=aiagent to any of the above. it defaults to webdev."
+	@echo "add C=aiagent to any of the first block. it defaults to webdev."
+
+# The whole of a fresh machine. Every step is idempotent except the restore,
+# which is skipped when there is already code in the volume to lose.
+install: up key restic
 	@echo ""
-	@echo "a machine that has never run this: make up, then follow what doctor says"
+	@if $(DOCKER) exec $(WEBDEV) sh -c 'test -z "$$(ls -A /home/dev/code)"' 2>/dev/null; then \
+		echo "code/ is empty, restoring the latest snapshot"; \
+		echo ""; \
+		$(DOCKER) exec -it $(WEBDEV) restic-restore; \
+	else \
+		echo "code/ already has something in it, so the restore is skipped."; \
+		echo "to pull the snapshot down anyway: make restore"; \
+	fi
+	@echo ""
+	@$(MAKE) --no-print-directory doctor
+	@echo ""
+	@echo "get in with: make shell"
 
 # Idempotent, so it repairs as readily as it installs. It never replaces a
 # running container, that is what `update` is for.
@@ -92,7 +129,7 @@ update: require-container
 		echo "replacing the container you are sitting in."; \
 		echo "this shell will drop in about two seconds. to get back in:"; \
 		echo ""; \
-		echo "    docker exec -it $(NAME) tmux"; \
+		echo "    make shell C=$(C)"; \
 		echo ""; \
 		$(DOCKER) rm --force bythewood-swap >/dev/null 2>&1 || true; \
 		$(DOCKER) run --rm --detach --name bythewood-swap \
@@ -110,7 +147,8 @@ update: require-container
 		echo "$(NAME) replaced. check it with: make doctor"; \
 	fi
 
-# Read only. Every line is either fine or carries the command that fixes it.
+# Read only. Every line is either fine or carries the command that fixes it,
+# and every one of those commands is a make target.
 doctor:
 	@probe() { \
 		st=$$($(DOCKER) inspect --format '{{.State.Status}}' "bythewood-$$1" 2>/dev/null); \
@@ -139,18 +177,18 @@ doctor:
 	done; \
 	echo ""; \
 	echo "webdev setup"; \
-	if $(DOCKER) exec bythewood-webdev test -s /home/dev/.ssh/home_key 2>/dev/null; then \
+	if $(DOCKER) exec $(WEBDEV) test -s /home/dev/.ssh/home_key 2>/dev/null; then \
 		echo "  git ssh key     ok"; \
 	else \
-		echo "  git ssh key     MISSING  -> docker cp \$$HOME/.ssh/home_key bythewood-webdev:/home/dev/.ssh/home_key"; \
+		echo "  git ssh key     MISSING  -> make key"; \
 	fi; \
-	$(DOCKER) exec bythewood-webdev restic-setup --check >/dev/null 2>&1; \
+	$(DOCKER) exec $(WEBDEV) restic-setup --check >/dev/null 2>&1; \
 	case $$? in \
 	0)   echo "  restic          ok" ;; \
 	127) echo "  restic          unknown  -> image predates restic-setup, run: make update" ;; \
-	*)   echo "  restic          NOT SET UP  -> docker exec -it bythewood-webdev restic-setup" ;; \
+	*)   echo "  restic          NOT SET UP  -> make restic" ;; \
 	esac; \
-	if $(DOCKER) exec bythewood-webdev test -L /home/dev/.claude/skills 2>/dev/null; then \
+	if $(DOCKER) exec $(WEBDEV) test -L /home/dev/.claude/skills 2>/dev/null; then \
 		echo "  claude dotfiles ok"; \
 	else \
 		echo "  claude dotfiles MISSING  -> make dotfiles"; \
@@ -159,8 +197,54 @@ doctor:
 shell: require-container
 	$(DOCKER) exec -it $(NAME) tmux
 
+build: require-container
+	$(DOCKER) build --tag $(IMAGE) -f containers/$(C)/Dockerfile .
+
 stop: require-container
 	$(DOCKER) stop $(NAME)
+
+# The git identity is the one thing that neither the image nor a restore can
+# carry, since restic will not have run yet on a fresh machine. Both containers
+# mount bythewood-ssh, so copying it once serves them both.
+#
+# The chown is explicit because docker cp lands the file as root, and the 600
+# because ssh refuses anything looser and a key copied off Windows arrives with
+# no usable mode at all.
+key: require-webdev
+	@test -s "$(KEY)" || { \
+		echo "no key at $(KEY)" >&2; \
+		echo "put your github key there, or point at it: make key KEY=/path/to/key" >&2; \
+		exit 1; \
+	}
+	@$(DOCKER) cp "$(KEY)" $(WEBDEV):/home/dev/.ssh/home_key
+	@$(DOCKER) exec --user root $(WEBDEV) sh -c \
+		"chown dev:dev /home/dev/.ssh /home/dev/.ssh/home_key && \
+		 chmod 700 /home/dev/.ssh && chmod 600 /home/dev/.ssh/home_key"
+	@echo "git key installed from $(KEY)"
+
+# Interactive, so it needs the tty that -it gives it. Suggests a password for a
+# new repository rather than asking you to invent one.
+restic: require-webdev
+	@$(DOCKER) exec -it $(WEBDEV) restic-setup
+
+# Run out of the checkout rather than the container, so a password can be minted
+# before there is anything to put it in. Nothing is written either way, and the
+# password goes to stdout on its own with the note on stderr, so it pipes clean.
+password:
+	@sh containers/webdev/scripts/restic-setup.sh --password
+
+backup: require-webdev
+	@$(DOCKER) exec $(WEBDEV) restic-backup
+
+snapshots: require-webdev
+	@$(DOCKER) exec $(WEBDEV) restic-status
+
+# Moves anything already in the volumes aside before it writes, and says where.
+restore: require-webdev
+	@$(DOCKER) exec -it $(WEBDEV) restic-restore
+
+sync: require-webdev
+	@$(DOCKER) exec $(WEBDEV) code-sync
 
 # /home/dev/.claude is a volume and shadows whatever the image puts there, so
 # these have to be linked into the running container. Safe to re-run.
@@ -186,10 +270,27 @@ models:
 	$(DOCKER) rm --force aiagent-fetch >/dev/null
 	echo "weights are in the bythewood-models volume"
 
+# A one-off in the foreground, so it neither rebuilds the image nor disturbs the
+# aiagent container. Weights it pulls stay in the volume.
+serve:
+	@test -n "$(MODEL)" || { \
+		echo "usage: make serve MODEL=<hf-repo>:<quant>" >&2; \
+		exit 1; \
+	}
+	$(DOCKER) run --rm --gpus all --volume bythewood-models:/models \
+		$(REGISTRY)/aiagent:latest -hf $(MODEL) --alias local
+
 require-container:
 	@test -d "containers/$(C)" || { \
 		echo "there is no container called '$(C)'. one of:" >&2; \
 		echo "  webdev" >&2; \
 		echo "  aiagent" >&2; \
+		exit 1; \
+	}
+
+require-webdev:
+	@$(DOCKER) inspect --format '{{.State.Running}}' $(WEBDEV) 2>/dev/null | grep -q true || { \
+		echo "$(WEBDEV) is not running, and this target works inside it." >&2; \
+		echo "start it with: make up" >&2; \
 		exit 1; \
 	}
