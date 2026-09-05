@@ -24,9 +24,16 @@
 #
 # Gotchas: --gpus all or it loads nothing. --init or tmux leaves zombies. The
 # server binds loopback and publishes nothing, so only pi in here reaches it and
-# it needs no API key. Weights plus a 128k q4_0 KV cache very nearly fill an 8GB
-# card, so a second CUDA process will not fit alongside them. Anything that
-# reaches the docker socket is root on the host.
+# it needs no API key. Anything that reaches the docker socket is root on the
+# host.
+#
+# Weights plus a 128k q4_0 KV cache measure 7931MiB of 8192 with a desktop on
+# the same card, so a second CUDA process will not fit and 261MiB is all the
+# room anything else has. Two ways to buy it back if that bites: 96k of context
+# saves about 300MiB, and q8_0 K and V at 64k measures 7704MiB and is the
+# trade worth making if output ever comes back as gibberish, since this model
+# runs 4 KV heads against 16 attention heads and that is the shape that
+# tolerates a 4 bit cache worst.
 
 
 FROM debian:trixie-slim AS build
@@ -228,7 +235,7 @@ ENV PI_OFFLINE=1 \
 #                 keeps the prompt cache an agent loop depends on
 #   --flash-attn  required for a quantized KV cache; K and V must match type
 ENTRYPOINT ["/usr/local/bin/llama-server"]
-CMD ["-hf", "unsloth/Qwen3.5-9B-GGUF:Q4_K_S", \
+CMD ["-hf", "unsloth/Qwen3.5-9B-GGUF:UD-Q4_K_XL", \
      "--alias", "local", \
      "--host", "127.0.0.1", "--port", "8000", \
      "--ctx-size", "131072", \
