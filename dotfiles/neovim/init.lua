@@ -70,3 +70,13 @@ function Statusline()
 end
 
 vim.opt.statusline = "%!v:lua.Statusline()"
+
+
+vim.opt.list = true
+vim.opt.listchars = { tab = "→ ", trail = "·", nbsp = "␣", extends = "»", precedes = "«" }
+vim.api.nvim_set_hl(0, "Whitespace", { fg = "#3a352e" })
+vim.api.nvim_set_hl(0, "NonText", { fg = "#3a352e" })
+
+vim.opt.tabstop = 4
+vim.opt.shiftwidth = 4
+vim.opt.softtabstop = 4
