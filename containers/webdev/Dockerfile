@@ -131,6 +131,14 @@ COPY dotfiles/neovim/init.lua /home/dev/.config/nvim/init.lua
 COPY dotfiles/tmux.conf /home/dev/.tmux.conf
 COPY containers/webdev/scripts/ /home/dev/scripts/
 
+# The file tree sidebar, as a native package so there is no plugin manager and
+# nothing to fetch on first run. Pinned because nvim here is 0.10, which is the
+# oldest release nvim-tree still supports.
+RUN git clone --quiet --depth 1 --branch v1.18.0 \
+        https://github.com/nvim-tree/nvim-tree.lua.git \
+        /home/dev/.config/nvim/pack/dev/start/nvim-tree.lua && \
+    rm -rf /home/dev/.config/nvim/pack/dev/start/nvim-tree.lua/.git
+
 # .claude.json lives in the volume so auth survives a rebuild.
 RUN mkdir -p /home/dev/code /home/dev/.claude /home/dev/.ssh /home/dev/.restic && \
     for f in /home/dev/scripts/*.sh; do mv "$f" "${f%.sh}"; done && \

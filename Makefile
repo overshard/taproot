@@ -251,8 +251,9 @@ sync: require-webdev
 dotfiles:
 	$(DOCKER) exec bythewood-webdev sh -c \
 		"ln -snf /home/dev/code/taproot/dotfiles/claude/skills /home/dev/.claude/skills && \
-		 ln -snf /home/dev/code/taproot/dotfiles/claude/status-line.sh /home/dev/.claude/status-line.sh"
-	echo "claude skills and status line linked"
+		 ln -snf /home/dev/code/taproot/dotfiles/claude/status-line.sh /home/dev/.claude/status-line.sh && \
+		 ln -snf /home/dev/code/taproot/dotfiles/neovim/init.lua /home/dev/.config/nvim/init.lua"
+	echo "claude skills, status line and neovim config linked"
 
 # The only step that reaches Hugging Face, weights land in the volume.
 # --list-devices cannot stand in for this, it exits before -hf is resolved.
