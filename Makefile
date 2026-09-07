@@ -26,7 +26,8 @@ C ?= webdev
 REGISTRY ?= overshard
 KEY ?= $(HOME)/.ssh/home_key
 
-VOLUMES = bythewood-code bythewood-claude bythewood-ssh bythewood-restic bythewood-models
+VOLUMES = bythewood-code bythewood-claude bythewood-ssh bythewood-restic bythewood-models \
+	bythewood-llm
 
 NAME   = bythewood-$(C)
 IMAGE  = $(REGISTRY)/$(C):latest
@@ -44,6 +45,7 @@ RUN_aiagent = --detach --name bythewood-aiagent --init --gpus all \
 	--volume bythewood-code:/home/ai/code \
 	--volume bythewood-ssh:/home/ai/.ssh \
 	--volume bythewood-models:/models \
+	--volume bythewood-llm:/home/ai/.llm \
 	--volume /var/run/docker.sock:/var/run/docker.sock
 
 RUN_ARGS = $(RUN_$(C))
@@ -54,7 +56,7 @@ RUN_ARGS = $(RUN_$(C))
 .NOTPARALLEL:
 
 .PHONY: help install up update doctor shell build stop key restic password \
-	backup snapshots restore sync dotfiles models serve \
+	backup snapshots restore sync dotfiles models serve llm-key \
 	require-container require-webdev
 
 help:
@@ -78,6 +80,7 @@ help:
 	@echo ""
 	@echo "make models         fetch the model weights once; needs the network"
 	@echo "make serve MODEL=   run a different model without rebuilding"
+	@echo "make llm-key KEY=    store the model gateway key aiagent uses"
 	@echo ""
 	@echo "add C=aiagent to any of the first block. it defaults to webdev."
 
@@ -270,6 +273,26 @@ models:
 	done
 	$(DOCKER) rm --force aiagent-fetch >/dev/null
 	echo "weights are in the bythewood-models volume"
+
+# Where aiagent's key for the model gateway is kept, so replacing the container
+# does not lose it. Mint the key on the gateway first, which prints it once:
+#
+#     cd ~/code/orchard && make llm-key NAME=aiagent
+#
+# With no key here aiagent starts its own model instead, which is the right
+# answer on a machine that is not the one running the gateway.
+llm-key:
+	@test -n "$(KEY)" || { \
+		echo "paste the key the gateway printed:" >&2; \
+		echo "" >&2; \
+		echo "  make llm-key KEY=orch-..." >&2; \
+		exit 1; \
+	}
+	@$(DOCKER) volume create bythewood-llm >/dev/null
+	@printf '%s' "$(KEY)" | $(DOCKER) run --rm -i \
+		--volume bythewood-llm:/k alpine:3 \
+		sh -c 'cat > /k/key && chmod 600 /k/key && chown 1001:1001 /k/key'
+	@echo "key stored. it takes effect on the next: make update C=aiagent"
 
 # A one-off in the foreground, so it neither rebuilds the image nor disturbs the
 # aiagent container. Weights it pulls stay in the volume.

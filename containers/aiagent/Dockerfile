@@ -1,6 +1,6 @@
 # aiagent
 #
-# Qwen3.5-9B at 128k context on a llama.cpp CUDA server, plus the pi coding
+# Ornith 1.5 9B at 128k context on a llama.cpp CUDA server, plus the pi coding
 # agent pointed at it. Sized for an 8GB Ampere card. No telemetry, no update
 # checks, no published port. It has no toolchain of its own and borrows what it
 # needs to compile from webdev over the mounted docker socket, see
@@ -234,8 +234,12 @@ ENV PI_OFFLINE=1 \
 #                 multi-slot load (ggml-org/llama.cpp#20222), and one slot
 #                 keeps the prompt cache an agent loop depends on
 #   --flash-attn  required for a quantized KV cache; K and V must match type
-ENTRYPOINT ["/usr/local/bin/llama-server"]
-CMD ["-hf", "unsloth/Qwen3.5-9B-GGUF:UD-Q4_K_XL", \
+# The entrypoint decides whether to be a model server at all. With
+# llm.bythewood.me reachable it points pi there and loads nothing, because one
+# card cannot hold the estate's model and a second copy of it. Without a gateway
+# it starts the server below, which is what this container always was.
+ENTRYPOINT ["/home/ai/scripts/aiagent-entrypoint"]
+CMD ["-hf", "ornith-ai/Ornith-1.5-9B-GGUF:Q4_K_M", \
      "--alias", "local", \
      "--host", "127.0.0.1", "--port", "8000", \
      "--ctx-size", "131072", \
