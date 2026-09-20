@@ -8,7 +8,7 @@
 # get subtly wrong.
 #
 #   restic-setup             check, then offer to fix whatever is wrong
-#   restic-setup --check     check only, quietly; exit 0 if backups will work
+#   restic-setup --check     check only and quietly, exit 0 if backups will work
 #   restic-setup --password  print a suggested password and exit, writing nothing
 #
 # The files it manages, all in the bythewood-restic volume:

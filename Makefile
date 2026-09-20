@@ -3,7 +3,7 @@
 # Every operation is a make target, so nothing here needs a docker command typed
 # by hand. Three cover most days:
 #
-#   make up          create what is missing and start it; safe to re-run
+#   make up          create what is missing and start it, safe to re-run
 #   make update      rebuild the image and replace the running container
 #   make doctor      what exists, what is running, what to type
 #

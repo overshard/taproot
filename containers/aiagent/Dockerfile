@@ -54,7 +54,7 @@ RUN apt-get update && \
 
 ENV PATH=/usr/local/cuda/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 
-# sm_86 alone keeps the build short; change it for another card.
+# sm_86 alone keeps the build short, so change it for another card.
 # FA_ALL_QUANTS is what makes flash attention work with a quantized KV cache.
 # Static libs because upstream ships shared objects without a SONAME, which
 # ldconfig then refuses to cache.
@@ -233,11 +233,11 @@ ENV PI_OFFLINE=1 \
 #   --parallel 1  hybrid attention corrupts context checkpoints under
 #                 multi-slot load (ggml-org/llama.cpp#20222), and one slot
 #                 keeps the prompt cache an agent loop depends on
-#   --flash-attn  required for a quantized KV cache; K and V must match type
+#   --flash-attn  required for a quantized KV cache, and K and V must match type
 # The entrypoint decides whether to be a model server at all. With
 # llm.bythewood.me reachable it points pi there and loads nothing, because one
 # card cannot hold the estate's model and a second copy of it. Without a gateway
-# it starts the server below, which is what this container always was.
+# it starts the server below.
 ENTRYPOINT ["/home/ai/scripts/aiagent-entrypoint"]
 CMD ["-hf", "ornith-ai/Ornith-1.5-9B-GGUF:Q4_K_M", \
      "--alias", "local", \
