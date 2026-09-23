@@ -10,8 +10,7 @@ its own deploy story.
 
 ## Requirements
 
-Docker, and a git key at `~/.ssh/home_key` that is on GitHub. For the AI
-container, an NVIDIA card and the container toolkit.
+Docker. For the AI container, an NVIDIA card and the container toolkit.
 
 ## Getting it running
 
@@ -21,15 +20,38 @@ defaults to `webdev`, which is the one you live in.
 
 ### From nothing
 
-A machine that has never run this:
+A new machine only needs Docker. There's no make or git on the host, so the
+first run borrows a throwaway Debian container, hands it the host's docker
+socket the same way webdev gets one, and does the install from in there. From
+PowerShell or sh:
 
 ```sh
+docker run --rm -it -v /var/run/docker.sock:/var/run/docker.sock debian:trixie-slim bash
+```
+
+Then inside it:
+
+```sh
+apt-get update && apt-get install -y --no-install-recommends ca-certificates git make docker-cli docker-buildx
+git clone https://github.com/overshard/taproot && cd taproot
 make install
 ```
 
-That makes the volumes, builds the image, starts the container, copies the git
-key in, walks through the backup credentials, and pulls everything back from the
-latest snapshot. That last step matters because not everything under `~/code`
+taproot is public so the clone needs no key, and the git key comes back with
+the restore since `~/.ssh` is in the backup. You're root in there, so the
+Makefile leaves off the `sudo` it uses everywhere else. When it finishes, `exit`
+throws the Debian container away and you move into webdev for good:
+
+```sh
+docker exec -it bythewood-webdev tmux
+```
+
+From then on everything runs from `~/code/taproot` inside webdev, which the
+restore brings back, or `code-sync` clones if there was nothing to restore.
+
+`make install` makes the volumes, builds the image, starts the container, walks
+through the backup credentials, and pulls everything back from the latest
+snapshot. That last step matters because not everything under `~/code`
 has a git remote to pull from, so restic is the only copy of it.
 
 The credentials step offers a generated repo password if there isn't one yet, so
@@ -68,8 +90,9 @@ make update
 ```
 
 This rebuilds and replaces. It works from inside the container it is replacing,
-so your shell drops for a couple of seconds and `make shell` from the host brings
-you back. Volumes are untouched.
+so your shell drops for a couple of seconds and
+`docker exec -it bythewood-webdev tmux` from the host brings you back. Volumes
+are untouched.
 
 ### When something is broken
 
@@ -106,7 +129,8 @@ is idempotent and repairs as readily as it installs.
 `up`, `update`, `doctor`, `shell`, `build` and `stop` take `C=webdev` (the
 default) or `C=aiagent`. The rest are webdev's.
 
-The docker socket is root-owned, so every command goes through `sudo`. On a host
+The docker socket is root-owned, so every command goes through `sudo` unless
+make is already running as root. On a host
 where docker needs none, turn it off: `make up SUDO=`.
 
 ## Layout
