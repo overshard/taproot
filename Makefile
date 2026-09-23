@@ -16,10 +16,11 @@
 #
 # Run from a clone of this repo, which is the build context.
 #
-# The docker socket is root-owned, so every command goes through sudo. On a host
-# where docker needs no sudo (Docker Desktop), turn it off:  make up SUDO=
+# The docker socket is root-owned, so every command goes through sudo unless
+# this is already root. On a host where docker needs no sudo (Docker Desktop),
+# turn it off:  make up SUDO=
 
-SUDO   ?= sudo
+SUDO   ?= $(if $(filter 0,$(shell id -u)),,sudo)
 DOCKER ?= $(SUDO) docker
 
 C ?= webdev
@@ -85,8 +86,11 @@ help:
 	@echo "add C=aiagent to any of the first block. it defaults to webdev."
 
 # The whole of a fresh machine. Every step is idempotent except the restore,
-# which is skipped when there is already code in the volume to lose.
-install: up key restic
+# which is skipped when there is already code in the volume to lose. The git
+# key is backed up with ~/.ssh, so a host without one gets it from the restore.
+install: up restic
+	@if [ -s "$(KEY)" ]; then $(MAKE) --no-print-directory key; \
+	else echo "no key at $(KEY), the restore will bring it back"; fi
 	@echo ""
 	@if $(DOCKER) exec $(WEBDEV) sh -c 'test -z "$$(ls -A /home/dev/code)"' 2>/dev/null; then \
 		echo "code/ is empty, restoring the latest snapshot"; \

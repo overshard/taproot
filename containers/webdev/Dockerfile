@@ -12,8 +12,8 @@
 #     make doctor      what exists, what is running, and what to type next
 #     make shell       get in, via tmux
 #
-# A machine that has never run this needs Docker and a git key at
-# ~/.ssh/home_key that is on GitHub, then one command:
+# A machine that has never run this needs Docker, then one command, which the
+# README shows running from a throwaway container when the host has no make:
 #
 #     make install     the above, plus the key, the B2 credentials and a restore
 #
