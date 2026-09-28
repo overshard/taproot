@@ -49,7 +49,7 @@ RUN apt-get update && \
     apt-get update && \
     apt-get install -y --no-install-recommends \
         git rsync neovim openssh-client tmux \
-        unzip xz-utils htop tree sudo jq restic sqlite3 poppler-utils \
+        unzip xz-utils btop tree sudo jq restic sqlite3 poppler-utils \
         build-essential tzdata python3 \
         docker-ce-cli docker-compose-plugin docker-buildx-plugin
 
