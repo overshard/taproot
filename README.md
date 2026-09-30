@@ -230,7 +230,7 @@ opening the repository, prompts for anything missing, and writes both files at
 ```sh
 make backup     # take a snapshot from this machine
 make snapshots  # check the repo from anywhere
-make restore    # existing data moves to ~/before-restore-<UTC>/ first
+make restore    # existing data moves to .before-restore-<UTC>/ inside each volume first
 ```
 
 **NOTE:** the repo password is not recoverable. Lose it and the snapshots in
