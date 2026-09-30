@@ -55,6 +55,7 @@ restic backup \
     --exclude="$HOME/code/orchard/bin" \
     --exclude='.vite' \
     --exclude='*.pyc' \
+    --exclude='.before-restore-*' \
     "$HOME/.claude" \
     "$HOME/code" \
     "$HOME/.ssh" || backup_exit=$?
