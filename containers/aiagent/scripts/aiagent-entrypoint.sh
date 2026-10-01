@@ -33,15 +33,18 @@ gateway_answers() {
 		"$GATEWAY/v1/models" >/dev/null 2>&1
 }
 
+# The window has to match the server's --ctx-size or pi compacts too late and
+# the server refuses the turn. The gateway runs 64k, the server below 128k.
 point_pi_at() {
 	tmp="$MODELS_JSON.tmp"
-	jq --arg url "$1/v1" --arg key "$2" \
-		'.providers.local.baseUrl = $url | .providers.local.apiKey = $key' \
+	jq --arg url "$1/v1" --arg key "$2" --argjson ctx "$3" \
+		'.providers.local.baseUrl = $url | .providers.local.apiKey = $key
+		 | .providers.local.models[0].contextWindow = $ctx' \
 		"$MODELS_JSON" > "$tmp" && mv "$tmp" "$MODELS_JSON"
 }
 
 if gateway_answers; then
-	point_pi_at "$GATEWAY" "$KEY"
+	point_pi_at "$GATEWAY" "$KEY" 65536
 	echo "using the model gateway at $GATEWAY, no weights loaded here" >&2
 	# Nothing to serve, but the container is a place to exec into, so it has
 	# to stay up. It runs with --init, which reaps what tmux leaves behind.
@@ -53,5 +56,5 @@ if [ -n "$KEY" ]; then
 else
 	echo "no LLM_KEY set, serving a model here" >&2
 fi
-point_pi_at "http://127.0.0.1:8000" "none"
+point_pi_at "http://127.0.0.1:8000" "none" 131072
 exec /usr/local/bin/llama-server "$@"
