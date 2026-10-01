@@ -5,8 +5,8 @@
 # Run a build tool inside the webdev container against this same source tree.
 #
 # aiagent has no toolchain of its own, so the docker exec lives here instead,
-# symlinked to `go`, `gofmt` and `bun` on PATH. The agent types `go build ./...`
-# and never has to know another container was involved.
+# symlinked to `go`, `gofmt`, `bun` and `make` on PATH. The agent types
+# `go build ./...` and never has to know another container was involved.
 #
 # Both containers mount bythewood-code and both run as UID 1001, so the file
 # webdev writes is the file aiagent reads. Only the mount point differs, and
@@ -27,7 +27,7 @@ DEV_ROOT=/home/dev/code
 # quietly turn every invocation into a wrong one.
 cmd=$(basename "$0")
 case "$cmd" in
-    go|gofmt|bun) ;;
+    go|gofmt|bun|make) ;;
     *)
         if [ $# -eq 0 ]; then
             echo "usage: webdev-exec <command> [args...]" >&2
