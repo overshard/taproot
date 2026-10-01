@@ -142,15 +142,34 @@ You have `read`, `bash`, `edit`, `write`, and web tools: `web_search`,
 `fetch_content` and `get_search_content`. Use them. Do not answer from memory
 when a fact can be looked up.
 
-`go`, `gofmt` and `bun` are on your PATH. They run in another container against
-these same files and there is nothing for you to set up, so use them as you
-would anywhere. If that container is not running they print what to do and exit
-non-zero, so pass the message on and do not claim the code builds.
+`go`, `gofmt`, `bun` and `make` are on your PATH. They run in another container
+against these same files and there is nothing for you to set up, so use them as
+you would anywhere. If that container is not running they print what to do and
+exit non-zero, so pass the message on and do not claim the code builds.
 
 Never run a command that does not exit on its own. No dev servers, no watch
 modes, no `bun run dev`, no `make run`. They hang and the work stops there.
 
 Only `~/code` is shared. Build from inside it.
+
+`make check` and `make test` are fine. Never run a make target that starts,
+replaces or deploys anything, so no `deploy`, `up`, `install`, `update`, `edge`,
+`down` or `stop`. Those change what is running for real.
+
+If a tool is missing, say so and stop there. Don't apt install anything and
+don't download binaries.
+
+## Hands off
+
+The CLAUDE.md files you load were written for another agent. Their journal,
+memory vault and commit instructions are not for you.
+
+- Never commit, push, or touch git config. Leave changes in the working tree
+  for a person to read.
+- Never read or write `~/code/memory`.
+- Never read `~/.ssh`, any `.env` file, or anything else holding a key or a
+  password. Everything you read is sent to the model gateway and kept in its
+  log, so reading a secret leaks it.
 
 ## Not every task is a coding task
 
@@ -194,12 +213,12 @@ AGENTS
 # extended-keys lets pi see modified Enter, appended here rather than added to
 # the shared dotfile so webdev's tmux is untouched.
 #
-# One script under three names, dispatching on its own argv[0], so the agent
+# One script under four names, dispatching on its own argv[0], so the agent
 # runs a plain `go build ./...` and never has to assemble a docker exec.
 RUN chown ai:ai /home/ai/.bash_aliases /home/ai/.tmux.conf && \
     for f in /home/ai/scripts/*.sh; do mv "$f" "${f%.sh}"; done && \
     chmod +x /home/ai/scripts/* && \
-    for t in go gofmt bun; do ln -s webdev-exec /home/ai/scripts/$t; done && \
+    for t in go gofmt bun make; do ln -s webdev-exec /home/ai/scripts/$t; done && \
     chown -R ai:ai /home/ai/scripts && \
     echo "source ~/.bash_aliases" >> /home/ai/.bashrc && \
     printf 'set -g extended-keys on\nset -g extended-keys-format csi-u\n' >> /home/ai/.tmux.conf
