@@ -226,13 +226,16 @@ RUN chown ai:ai /home/ai/.bash_aliases /home/ai/.tmux.conf && \
 WORKDIR /home/ai/code
 USER ai
 
+# The gateway serves with reasoning off, and qwen-chat-template is how pi asks
+# for it per turn. Any level but off turns it on, and off skims files.
+#
 # web-search.json pins duckduckgo because the default chain ends at Exa's
 # public endpoint when no API keys are set, and workflow "none" because the
 # default blocks on a browser curator that never opens in a container.
 RUN pi install npm:pi-web-access && \
-    printf '%s' '{"providers":{"local":{"baseUrl":"http://127.0.0.1:8000/v1","api":"openai-completions","apiKey":"none","compat":{"supportsDeveloperRole":false,"supportsReasoningEffort":false},"models":[{"id":"local","name":"local","contextWindow":131072,"maxTokens":8192,"input":["text"],"cost":{"input":0,"output":0,"cacheRead":0,"cacheWrite":0}}]}}}' \
+    printf '%s' '{"providers":{"local":{"baseUrl":"http://127.0.0.1:8000/v1","api":"openai-completions","apiKey":"none","compat":{"supportsDeveloperRole":false,"supportsReasoningEffort":false,"thinkingFormat":"qwen-chat-template"},"models":[{"id":"local","name":"local","reasoning":true,"contextWindow":131072,"maxTokens":8192,"input":["text"],"cost":{"input":0,"output":0,"cacheRead":0,"cacheWrite":0}}]}}}' \
         > /home/ai/.pi/agent/models.json && \
-    printf '%s' '{"packages":["npm:pi-web-access"],"enableInstallTelemetry":false,"enableAnalytics":false}' \
+    printf '%s' '{"packages":["npm:pi-web-access"],"enableInstallTelemetry":false,"enableAnalytics":false,"defaultThinkingLevel":"medium"}' \
         > /home/ai/.pi/agent/settings.json && \
     printf '%s' '{"searchProvider":"duckduckgo","workflow":"none","autoOpenBrowser":false}' \
         > /home/ai/.pi/web-search.json
