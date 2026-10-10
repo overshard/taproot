@@ -10,13 +10,42 @@ its own deploy story.
 
 ## Requirements
 
-Docker. For the AI container, an NVIDIA card and the container toolkit.
+Docker. On Windows that's docker-ce in a Debian WSL distro, which `make wsl`
+sets up. For the AI container, an NVIDIA card and the container toolkit.
 
 ## Getting it running
 
 Everything is a make target and there are no scripts to invoke by hand. Add
 `C=aiagent` to any of the container ones to work on the other container, it
 defaults to `webdev`, which is the one you live in.
+
+### The Windows host
+
+The host is a Debian distro under WSL running docker-ce, no Docker Desktop. From
+PowerShell:
+
+```sh
+wsl --install -d Debian
+```
+
+Then inside it:
+
+```sh
+sudo apt update && sudo apt install -y git make
+git clone https://github.com/overshard/taproot && cd taproot
+make wsl
+```
+
+The first `make wsl` switches systemd on and stops, since it needs a `wsl
+--shutdown` from PowerShell before it takes. Open Debian again and run it a
+second time, which installs docker-ce, compose and the NVIDIA container toolkit,
+and drops a hidden `wsl.exe` into the Windows Startup folder. WSL stops a distro
+about 15 seconds after its last terminal closes even with dockerd running, so
+without that every container goes down when you close the window. Install the
+NVIDIA driver on Windows only, never inside the distro.
+
+From there, `make install` in that clone does the rest, as below, without the
+throwaway container.
 
 ### From nothing
 
@@ -241,13 +270,12 @@ that repository are lost with it. It lives in 1Password.
 `--init` is required. Without a real PID 1, tmux leaves zombies behind and they
 accumulate for the life of the container.
 
-The mounted `docker.sock` is `root:root` mode 660, so docker commands inside
+The mounted `docker.sock` is root-owned mode 660, so docker commands inside
 need `sudo`. Being in the docker group does not help.
 
 Bind mounts of paths under `/home/dev` do not work from inside the container.
-The daemon is Docker Desktop on the Windows host and resolves the source path
-against its own filesystem, so it silently mounts an empty directory instead of
-failing. Named volumes are what work.
+The daemon runs on the host and resolves the source path against its own
+filesystem, so it silently mounts an empty directory instead of failing. Named volumes are what work.
 
 Debian's `/etc/profile` assigns `PATH` outright rather than appending, so a login
 shell (which every tmux pane is) drops whatever `ENV PATH` added. Both images

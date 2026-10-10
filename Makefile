@@ -17,8 +17,8 @@
 # Run from a clone of this repo, which is the build context.
 #
 # The docker socket is root-owned, so every command goes through sudo unless
-# this is already root. On a host where docker needs no sudo (Docker Desktop),
-# turn it off:  make up SUDO=
+# this is already root. On a host where docker needs no sudo, turn it off:
+#   make up SUDO=
 
 SUDO   ?= $(if $(filter 0,$(shell id -u)),,sudo)
 DOCKER ?= $(SUDO) docker
@@ -56,11 +56,12 @@ RUN_ARGS = $(RUN_$(C))
 # install runs its prerequisites in order and a parallel make would not.
 .NOTPARALLEL:
 
-.PHONY: help install up update doctor shell build stop key restic password \
+.PHONY: help wsl install up update doctor shell build stop key restic password \
 	backup snapshots restore sync dotfiles models serve llm-key \
 	require-container require-webdev
 
 help:
+	@echo "make wsl            turn a fresh Debian WSL distro into the docker host"
 	@echo "make install        a machine that has never run this, start to finish"
 	@echo "make up             create what is missing and start it; safe to re-run"
 	@echo "make update         rebuild the image and replace the running container"
@@ -84,6 +85,50 @@ help:
 	@echo "make llm-key KEY=    store the model gateway key aiagent uses"
 	@echo ""
 	@echo "add C=aiagent to any of the first block. it defaults to webdev."
+
+# Turns a fresh Debian WSL distro into the docker host, run from inside it. The
+# first run only switches systemd on and asks for a wsl --shutdown, since
+# dockerd needs it as PID 1. The CUDA driver comes from Windows, so only the
+# container toolkit goes in here.
+#
+# WSL stops a distro about 15 seconds after its last terminal closes, systemd
+# or not, so a hidden wsl.exe in the Windows Startup folder holds it open.
+wsl:
+	@grep -qi microsoft /proc/version || { echo "this is for a WSL distro" >&2; exit 1; }
+	@if [ "$$(cat /proc/1/comm)" != systemd ]; then \
+		grep -qs '^systemd=true' /etc/wsl.conf || printf '[boot]\nsystemd=true\n' | sudo tee -a /etc/wsl.conf >/dev/null; \
+		echo "systemd is switched on. from PowerShell run:"; \
+		echo ""; \
+		echo "    wsl --shutdown"; \
+		echo ""; \
+		echo "then open $$WSL_DISTRO_NAME again and rerun: make wsl"; \
+		exit 1; \
+	fi
+	sudo apt-get update
+	sudo apt-get install -y ca-certificates curl gpg
+	sudo install -m 0755 -d /etc/apt/keyrings
+	sudo curl -fsSL https://download.docker.com/linux/debian/gpg -o /etc/apt/keyrings/docker.asc
+	echo "deb [arch=$$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/debian $$(. /etc/os-release && echo $$VERSION_CODENAME) stable" | \
+		sudo tee /etc/apt/sources.list.d/docker.list >/dev/null
+	curl -fsSL https://nvidia.github.io/libnvidia-container/gpgkey | \
+		sudo gpg --batch --yes --dearmor -o /usr/share/keyrings/nvidia-container-toolkit-keyring.gpg
+	curl -fsSL https://nvidia.github.io/libnvidia-container/stable/deb/nvidia-container-toolkit.list | \
+		sed 's#deb https://#deb [signed-by=/usr/share/keyrings/nvidia-container-toolkit-keyring.gpg] https://#' | \
+		sudo tee /etc/apt/sources.list.d/nvidia-container-toolkit.list >/dev/null
+	sudo apt-get update
+	sudo apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin \
+		docker-compose-plugin nvidia-container-toolkit
+	sudo nvidia-ctk runtime configure --runtime=docker
+	sudo systemctl restart docker
+	@startup="$$(wslpath "$$(cmd.exe /c 'echo %APPDATA%' 2>/dev/null | tr -d '\r')")/Microsoft/Windows/Start Menu/Programs/Startup"; \
+	vbs="$$startup/wsl-$$WSL_DISTRO_NAME.vbs"; \
+	printf 'CreateObject("WScript.Shell").Run "wsl.exe -d %s --exec sleep infinity", 0, False\r\n' "$$WSL_DISTRO_NAME" > "$$vbs"; \
+	wscript.exe "$$(wslpath -w "$$vbs")"; \
+	echo "keepalive written to $$vbs and started"
+	@echo ""
+	$(DOCKER) run --rm --gpus all debian:trixie-slim nvidia-smi
+	@echo ""
+	@echo "the docker host is ready. if that table shows the card, the GPU works too."
 
 # The whole of a fresh machine. Every step is idempotent except the restore,
 # which is skipped when there is already code in the volume to lose. The git
