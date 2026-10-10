@@ -86,18 +86,30 @@ help:
 	@echo ""
 	@echo "add C=aiagent to any of the first block. it defaults to webdev."
 
-# Turns a fresh Debian WSL distro into the docker host, run from inside it. The
-# first run only switches systemd on and asks for a wsl --shutdown, since
-# dockerd needs it as PID 1. The CUDA driver comes from Windows, so only the
-# container toolkit goes in here.
+# Turns a fresh Debian WSL distro into the docker host, run from inside it.
+# dockerd needs systemd as PID 1, which new Debian installs already have, and
+# the GPU containers need the container toolkit. The NVIDIA driver itself comes
+# from Windows and must never be installed in here.
 #
-# WSL stops a distro about 15 seconds after its last terminal closes, systemd
-# or not, so a hidden wsl.exe in the Windows Startup folder holds it open.
+# Everything this does is ordinary Debian: apt packages, vendor apt repos, a
+# systemd service, config in /etc. The Windows half it cannot do from in here
+# is printed at the end, since .wslconfig and a disk move both want PowerShell.
 wsl:
 	@grep -qi microsoft /proc/version || { echo "this is for a WSL distro" >&2; exit 1; }
+# Docker Desktop's integration proxy replaces /run/docker.sock in the distro
+# with its own, then dies with the engine and leaves dockerd unreachable.
+	@test ! -d /mnt/wsl/docker-desktop || { \
+		echo "Docker Desktop's WSL integration is on for $$WSL_DISTRO_NAME, and it" >&2; \
+		echo "will replace the socket this distro's own dockerd listens on." >&2; \
+		echo "turn it off first:" >&2; \
+		echo "" >&2; \
+		echo "  Docker Desktop -> Settings -> Resources -> WSL integration" >&2; \
+		echo "  turn off $$WSL_DISTRO_NAME and the default distro switch, apply" >&2; \
+		exit 1; \
+	}
 	@if [ "$$(cat /proc/1/comm)" != systemd ]; then \
 		grep -qs '^systemd=true' /etc/wsl.conf || printf '[boot]\nsystemd=true\n' | sudo tee -a /etc/wsl.conf >/dev/null; \
-		echo "systemd is switched on. from PowerShell run:"; \
+		echo "systemd is switched on in /etc/wsl.conf. from PowerShell run:"; \
 		echo ""; \
 		echo "    wsl --shutdown"; \
 		echo ""; \
@@ -108,8 +120,11 @@ wsl:
 	sudo apt-get install -y ca-certificates curl gpg
 	sudo install -m 0755 -d /etc/apt/keyrings
 	sudo curl -fsSL https://download.docker.com/linux/debian/gpg -o /etc/apt/keyrings/docker.asc
-	echo "deb [arch=$$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/debian $$(. /etc/os-release && echo $$VERSION_CODENAME) stable" | \
-		sudo tee /etc/apt/sources.list.d/docker.list >/dev/null
+	sudo chmod a+r /etc/apt/keyrings/docker.asc
+	printf 'Types: deb\nURIs: https://download.docker.com/linux/debian\nSuites: %s\nComponents: stable\nArchitectures: %s\nSigned-By: /etc/apt/keyrings/docker.asc\n' \
+		"$$(. /etc/os-release && echo $$VERSION_CODENAME)" "$$(dpkg --print-architecture)" | \
+		sudo tee /etc/apt/sources.list.d/docker.sources >/dev/null
+	sudo rm -f /etc/apt/sources.list.d/docker.list
 	curl -fsSL https://nvidia.github.io/libnvidia-container/gpgkey | \
 		sudo gpg --batch --yes --dearmor -o /usr/share/keyrings/nvidia-container-toolkit-keyring.gpg
 	curl -fsSL https://nvidia.github.io/libnvidia-container/stable/deb/nvidia-container-toolkit.list | \
@@ -119,16 +134,53 @@ wsl:
 	sudo apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin \
 		docker-compose-plugin nvidia-container-toolkit
 	sudo nvidia-ctk runtime configure --runtime=docker
-	sudo systemctl restart docker
+	sudo systemctl enable --now docker
+	sudo usermod -aG docker $$USER
+# This is what starts the distro at logon, and systemd then starts docker and
+# every container with a restart policy. Logon, not boot, so the sites come back
+# at sign-in rather than at power on.
 	@startup="$$(wslpath "$$(cmd.exe /c 'echo %APPDATA%' 2>/dev/null | tr -d '\r')")/Microsoft/Windows/Start Menu/Programs/Startup"; \
 	vbs="$$startup/wsl-$$WSL_DISTRO_NAME.vbs"; \
 	printf 'CreateObject("WScript.Shell").Run "wsl.exe -d %s --exec sleep infinity", 0, False\r\n' "$$WSL_DISTRO_NAME" > "$$vbs"; \
 	wscript.exe "$$(wslpath -w "$$vbs")"; \
-	echo "keepalive written to $$vbs and started"
+	echo "logon starter written to $$vbs and started"
 	@echo ""
 	$(DOCKER) run --rm --gpus all debian:trixie-slim nvidia-smi
 	@echo ""
-	@echo "the docker host is ready. if that table shows the card, the GPU works too."
+	@echo "docker and the GPU are up. what is left is on the Windows side:"
+	@echo ""
+	@conf="$$(wslpath "$$(cmd.exe /c 'echo %USERPROFILE%' 2>/dev/null | tr -d '\r')")/.wslconfig"; \
+	echo "  $$conf"; \
+	for kv in general:instanceIdleTimeout=-1 general:distributionInstallPath='D:\\WSL' wsl2:swapFile='D:\\WSL\\swap.vhdx'; do \
+		key=$$(echo "$$kv" | sed 's/^[a-z2]*://;s/=.*//'); \
+		if grep -qs "^$$key[[:space:]]*=" "$$conf"; then \
+			printf '    %-24s %s\n' "$$key" "set"; \
+		else \
+			printf '    %-24s %s\n' "$$key" "MISSING  [$$(echo $$kv | cut -d: -f1)] $$(echo $$kv | cut -d: -f2-)"; \
+		fi; \
+	done; \
+	echo "    instanceIdleTimeout=-1 is what the WSL Settings app calls"; \
+	echo "    \"Keep WSL running\". without it the distro stops 15s after its"; \
+	echo "    last terminal closes and takes every container with it."; \
+	echo "    a .wslconfig change needs: wsl --shutdown"
+	@echo ""
+	@if sudo grep -rqs NOPASSWD /etc/sudoers.d/ 2>/dev/null; then \
+		echo "  passwordless sudo  set"; \
+	else \
+		echo "  passwordless sudo  not set, and a long job will stop for a password."; \
+		echo "    sudo visudo -f /etc/sudoers.d/$$USER"; \
+		echo "    $$USER ALL=(ALL:ALL) NOPASSWD: ALL"; \
+		echo "    undo by deleting that file"; \
+	fi
+	@echo ""
+	@echo "  images and volumes all live in the distro's one ext4.vhdx."
+	@echo "  to put it on another drive, from PowerShell:"
+	@echo "    wsl --shutdown"
+	@echo "    wsl --manage $$WSL_DISTRO_NAME --move D:\\WSL\\$$WSL_DISTRO_NAME"
+	@echo "  then wsl --shutdown once more, since the move starts the VM before"
+	@echo "  the new directory exists and swap fails to come up the first time."
+	@echo ""
+	@echo "then: make install"
 
 # The whole of a fresh machine. Every step is idempotent except the restore,
 # which is skipped when there is already code in the volume to lose. The git
