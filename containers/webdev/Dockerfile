@@ -19,11 +19,10 @@
 #
 # `make help` lists the rest and `make doctor` reports on all of it.
 #
-# Gotchas: --init or tmux leaves zombies. docker.sock is root:root 660, so
+# Gotchas: --init or tmux leaves zombies. docker.sock is root-owned 660, so
 # docker needs sudo in here. --publish is what makes port 8000 reachable from
 # the host browser. Bind mounts under /home/dev silently mount empty, because
-# the daemon is Docker Desktop and resolves paths on the Windows side, so use
-# named volumes.
+# the daemon resolves paths on the host, so use named volumes.
 
 FROM debian:trixie-slim
 
@@ -96,7 +95,7 @@ RUN curl -fsSL -o /tmp/gh.tar.gz \
     gh --version
 
 # The pin matters. 0.1.14 drives a page, while 0.1.18 and unpinned both die with
-# "No usable sandbox" under Docker Desktop on WSL2, so drive a real page after
+# "No usable sandbox" under Docker on WSL2, so drive a real page after
 # any bump. Some tools want Chrome at the /opt path, hence the symlink.
 ARG PLAYWRIGHT_CLI_VERSION=0.1.14
 ENV PLAYWRIGHT_BROWSERS_PATH=/opt/playwright-browsers
