@@ -157,6 +157,15 @@ wsl:
 	printf 'APT::Periodic::Update-Package-Lists "1";\nAPT::Periodic::Unattended-Upgrade "1";\n' | \
 		sudo tee /etc/apt/apt.conf.d/20auto-upgrades >/dev/null
 	sudo systemctl enable --now unattended-upgrades.service apt-daily.timer apt-daily-upgrade.timer
+# The backup was manual, so a week could pass between snapshots without anyone
+# noticing. Persistent catches up a run the machine slept through, and it is a
+# host timer rather than a container one so it survives webdev being replaced.
+	printf '[Unit]\nDescription=restic backup of the webdev volumes\nAfter=docker.service\nRequires=docker.service\n\n[Service]\nType=oneshot\nExecStart=/usr/bin/docker exec bythewood-webdev restic-backup\n' | \
+		sudo tee /etc/systemd/system/restic-backup.service >/dev/null
+	printf '[Unit]\nDescription=daily restic backup\n\n[Timer]\nOnCalendar=daily\nPersistent=true\nRandomizedDelaySec=30m\n\n[Install]\nWantedBy=timers.target\n' | \
+		sudo tee /etc/systemd/system/restic-backup.timer >/dev/null
+	sudo systemctl daemon-reload
+	sudo systemctl enable --now restic-backup.timer
 # Something has to start the distro, since WSL has no autostart setting of its
 # own. A boot task covers power on and a Startup file covers sign-in, so write
 # the file only when no boot task is there to do the job.
@@ -357,16 +366,22 @@ stop: require-container
 # because ssh refuses anything looser and a key copied off Windows arrives with
 # no usable mode at all.
 key: require-webdev
-	@test -s "$(KEY)" || { \
-		echo "no key at $(KEY)" >&2; \
-		echo "put your github key there, or point at it: make key KEY=/path/to/key" >&2; \
-		exit 1; \
-	}
-	@$(DOCKER) cp "$(KEY)" $(WEBDEV):/home/dev/.ssh/home_key
-	@$(DOCKER) exec --user root $(WEBDEV) sh -c \
+	@src="$(KEY)"; \
+	if [ ! -s "$$src" ]; then \
+		if $(DOCKER) exec $(WEBDEV) test -s /home/dev/.ssh/home_key 2>/dev/null; then \
+			echo "the git key is already in the volume, nothing to copy"; \
+			exit 0; \
+		fi; \
+		echo "no key at $$src"; \
+		printf 'path to your github key: '; \
+		read -r src; \
+		test -s "$$src" || { echo "nothing readable at $$src" >&2; exit 1; }; \
+	fi; \
+	$(DOCKER) cp "$$src" $(WEBDEV):/home/dev/.ssh/home_key; \
+	$(DOCKER) exec --user root $(WEBDEV) sh -c \
 		"chown dev:dev /home/dev/.ssh /home/dev/.ssh/home_key && \
-		 chmod 700 /home/dev/.ssh && chmod 600 /home/dev/.ssh/home_key"
-	@echo "git key installed from $(KEY)"
+		 chmod 700 /home/dev/.ssh && chmod 600 /home/dev/.ssh/home_key"; \
+	echo "git key installed from $$src"
 
 # Interactive, so it needs the tty that -it gives it. Suggests a password for a
 # new repository rather than asking you to invent one.
@@ -418,24 +433,33 @@ models:
 	echo "weights are in the bythewood-models volume"
 
 # Where aiagent's key for the model gateway is kept, so replacing the container
-# does not lose it. Mint the key on the gateway first, which prints it once:
+# does not lose it. KEY defaults to the ssh key path for `make key`, so only an
+# orch- prefixed value counts here and anything else means nothing was passed. Mint the key on the gateway first, which prints it once:
 #
 #     cd ~/code/orchard && make llm-key NAME=aiagent
 #
 # With no key here aiagent starts its own model instead, which is the right
 # answer on a machine that is not the one running the gateway.
 llm-key:
-	@test -n "$(KEY)" || { \
-		echo "paste the key the gateway printed:" >&2; \
-		echo "" >&2; \
-		echo "  make llm-key KEY=orch-..." >&2; \
-		exit 1; \
-	}
 	@$(DOCKER) volume create bythewood-llm >/dev/null
-	@printf '%s' "$(KEY)" | $(DOCKER) run --rm -i \
+	@key=""; \
+	case "$(KEY)" in orch-*) key="$(KEY)" ;; esac; \
+	if [ -z "$$key" ]; then \
+		if $(DOCKER) run --rm --volume bythewood-llm:/k debian:trixie-slim \
+			test -s /k/key 2>/dev/null; then \
+			echo "a gateway key is already stored, left alone"; \
+			echo "to replace it: make llm-key KEY=orch-..."; \
+			exit 0; \
+		fi; \
+		echo "mint one on the gateway first: cd ~/code/orchard && make llm-key NAME=aiagent"; \
+		printf 'paste the key it printed: '; \
+		read -r key; \
+	fi; \
+	case "$$key" in orch-*) ;; *) echo "that does not look like a gateway key" >&2; exit 1 ;; esac; \
+	printf '%s' "$$key" | $(DOCKER) run --rm -i \
 		--volume bythewood-llm:/k debian:trixie-slim \
-		sh -c 'cat > /k/key && chmod 600 /k/key && chown 1001:1001 /k/key'
-	@echo "key stored. it takes effect on the next: make update C=aiagent"
+		sh -c 'cat > /k/key && chmod 600 /k/key && chown 1001:1001 /k/key'; \
+	echo "key stored. it takes effect on the next: make update C=aiagent"
 
 # A one-off in the foreground, so it neither rebuilds the image nor disturbs the
 # aiagent container. Weights it pulls stay in the volume.

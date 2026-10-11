@@ -133,6 +133,81 @@ it.
 From there, `make install` in that clone does the rest, as below, without the
 throwaway container.
 
+### The machine is gone
+
+Everything that matters is in two places: GitHub for `orchard` and `taproot`,
+and the restic repository on B2 for `~/code` (both checkouts plus the memory
+vault), `~/.claude` and `~/.ssh`. Nothing in a Docker volume is needed. Site
+databases, logs, ntfy accounts, gateway keys and the Wikipedia snapshot are all
+regenerated, the bare repos on `repos.bythewood.me` are all mirrored on GitHub,
+and the tunnel credentials come back from Cloudflare.
+
+**Get these out of Bitwarden before starting**, because nothing below works
+without them and they are not in any backup:
+
+- the B2 application key id and key, for `overshard-backups`
+- the restic repository password for the `webdev` repo
+
+Allow about an hour and a half, most of it waiting on downloads.
+
+**1. Windows, about 10 minutes.** Install WSL and Debian, then set up the host:
+
+```sh
+wsl --install -d Debian
+```
+
+```sh
+sudo apt update && sudo apt install -y git make
+git clone https://github.com/overshard/taproot && cd taproot
+make wsl
+```
+
+Follow what it prints. See **The Windows host** above for the `.wslconfig` keys
+and the boot task.
+
+**2. webdev and the restore, about 30 minutes.** Still in the distro:
+
+```sh
+make install
+```
+
+It creates the volumes, builds the image, starts the container, asks for the B2
+credentials and the repo password, then pulls the snapshot down. That is about
+2.8GB compressed. When it finishes, move in:
+
+```sh
+make shell
+```
+
+`~/code` is back, with both checkouts, the vault, and every site's `.env`.
+
+**3. The sites, about 20 minutes.** Inside webdev:
+
+```sh
+cd ~/code/orchard && make install
+```
+
+It logs into Cloudflare in a browser, recovers the tunnel credentials for the
+existing `orchard` tunnel, brings every container up, mints the gateway keys,
+creates the ntfy accounts and initialises the login. Write down what it prints,
+since the ntfy passwords and the auth recovery codes exist nowhere else.
+
+**4. The long tail, whenever.** Neither is needed for a site to serve:
+
+```sh
+cd ~/code/orchard && make wiki     # 12.5GB, for chat's offline Wikipedia
+cd ~/code/taproot && make models   # the weights for aiagent
+```
+
+**What will bite you.** The tunnel keeps its UUID only because step 3 recovers
+the existing credentials rather than creating a second tunnel, so do not run
+`sh edge/setup-tunnel.sh down` in a hurry, since that deletes the tunnel and
+leaves every CNAME pointing at nothing. `make install` in orchard skips any
+site that already has a `.env`, which is what you want after a restore and not
+what you want on a genuinely new machine. And the restore refuses to run if the
+code volume is not empty, so a half-finished attempt wants `make restore`
+rather than `make install` a second time.
+
 ### From nothing
 
 A new machine only needs Docker. There's no make or git on the host, so the
