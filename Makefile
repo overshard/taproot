@@ -141,8 +141,14 @@ wsl:
 	sudo apt-get update
 	sudo apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin \
 		docker-compose-plugin nvidia-container-toolkit
+# Without a cap the json-file driver grows forever and the distro's vhdx grows
+# with it, since a vhdx never shrinks back. Written before nvidia-ctk, which
+# reads this file and merges its runtime into whatever is already here.
+	printf '{\n    "log-driver": "json-file",\n    "log-opts": {\n        "max-size": "10m",\n        "max-file": "3"\n    }\n}\n' | \
+		sudo tee /etc/docker/daemon.json >/dev/null
 	sudo nvidia-ctk runtime configure --runtime=docker
 	sudo systemctl enable --now docker
+	sudo systemctl restart docker
 	sudo usermod -aG docker $$USER
 # Security updates apply themselves. Debian's default origin list is only
 # trixie-security, so docker and the toolkit are left for a deliberate apt
@@ -243,7 +249,7 @@ install: up restic
 up: require-container
 	for v in $(VOLUMES); do $(DOCKER) volume create $$v >/dev/null; done
 	$(DOCKER) image inspect $(IMAGE) >/dev/null 2>&1 || \
-		$(DOCKER) build --tag $(IMAGE) -f containers/$(C)/Dockerfile .
+		$(DOCKER) build --pull --tag $(IMAGE) -f containers/$(C)/Dockerfile .
 	state=$$($(DOCKER) inspect --format '{{.State.Status}}' $(NAME) 2>/dev/null); \
 	case "$$state" in \
 	running) echo "$(NAME) is already running" ;; \
@@ -261,7 +267,7 @@ up: require-container
 # Nothing below may contain $$(MAKE). GNU make runs any recipe line carrying
 # that string even under `-n`, so a dry run would really replace the container.
 update: require-container
-	$(DOCKER) build --tag $(IMAGE) -f containers/$(C)/Dockerfile .
+	$(DOCKER) build --pull --tag $(IMAGE) -f containers/$(C)/Dockerfile .
 	@self=$$(cat /etc/hostname 2>/dev/null); \
 	target=$$($(DOCKER) inspect --format '{{.Id}}' $(NAME) 2>/dev/null | cut -c1-12); \
 	if [ -n "$$target" ] && [ "$$self" = "$$target" ]; then \
@@ -338,7 +344,7 @@ shell: require-container
 	$(DOCKER) exec -it $(NAME) tmux
 
 build: require-container
-	$(DOCKER) build --tag $(IMAGE) -f containers/$(C)/Dockerfile .
+	$(DOCKER) build --pull --tag $(IMAGE) -f containers/$(C)/Dockerfile .
 
 stop: require-container
 	$(DOCKER) stop $(NAME)

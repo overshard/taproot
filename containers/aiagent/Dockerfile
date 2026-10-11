@@ -36,7 +36,7 @@
 # tolerates a 4 bit cache worst.
 
 
-FROM debian:trixie-slim AS build
+FROM debian:trixie-slim@sha256:a99cfc517144bc59b1978475ec53b46ecabec7e43635402ee5b77cc54cd1b20a AS build
 
 # CUDA 13.2 produces gibberish from low-bit quants.
 ARG CUDA=13-3
@@ -58,7 +58,8 @@ ENV PATH=/usr/local/cuda/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/
 # FA_ALL_QUANTS is what makes flash attention work with a quantized KV cache.
 # Static libs because upstream ships shared objects without a SONAME, which
 # ldconfig then refuses to cache.
-RUN git clone --depth 1 https://github.com/ggml-org/llama.cpp /tmp/src && \
+ARG LLAMA_REF=v0.6.0
+RUN git clone --depth 1 --branch ${LLAMA_REF} https://github.com/ggml-org/llama.cpp /tmp/src && \
     cmake -S /tmp/src -B /tmp/build -G Ninja \
         -DCMAKE_BUILD_TYPE=Release \
         -DBUILD_SHARED_LIBS=OFF \
@@ -73,7 +74,7 @@ RUN git clone --depth 1 https://github.com/ggml-org/llama.cpp /tmp/src && \
     strip /tmp/build/bin/llama-server /tmp/build/bin/llama-bench
 
 
-FROM debian:trixie-slim
+FROM debian:trixie-slim@sha256:a99cfc517144bc59b1978475ec53b46ecabec7e43635402ee5b77cc54cd1b20a
 
 ARG CUDA=13-3
 

@@ -24,7 +24,7 @@
 # the host browser. Bind mounts under /home/dev silently mount empty, because
 # the daemon resolves paths on the host, so use named volumes.
 
-FROM debian:trixie-slim
+FROM debian:trixie-slim@sha256:a99cfc517144bc59b1978475ec53b46ecabec7e43635402ee5b77cc54cd1b20a
 
 # BUN_INSTALL is persistent: it also decides where `bun install -g` puts globals.
 ENV DEBIAN_FRONTEND=noninteractive \
@@ -43,14 +43,15 @@ RUN apt-get update && \
     install -m 0755 -d /etc/apt/keyrings && \
     curl -fsSL https://download.docker.com/linux/debian/gpg -o /etc/apt/keyrings/docker.asc && \
     chmod a+r /etc/apt/keyrings/docker.asc && \
-    echo "deb [arch=amd64 signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/debian trixie stable" \
-        > /etc/apt/sources.list.d/docker.list && \
+    printf 'Types: deb\nURIs: https://download.docker.com/linux/debian\nSuites: trixie\nComponents: stable\nArchitectures: amd64\nSigned-By: /etc/apt/keyrings/docker.asc\n' \
+        > /etc/apt/sources.list.d/docker.sources && \
     apt-get update && \
     apt-get install -y --no-install-recommends \
         git rsync neovim openssh-client tmux \
         unzip xz-utils btop tree sudo jq restic sqlite3 poppler-utils \
         build-essential tzdata python3 \
-        docker-ce-cli docker-compose-plugin docker-buildx-plugin
+        docker-ce-cli docker-compose-plugin docker-buildx-plugin && \
+    rm -rf /var/lib/apt/lists/*
 
 RUN curl -fsSL https://astral.sh/uv/install.sh | env UV_INSTALL_DIR=/usr/local/bin sh && \
     curl -fsSL https://bun.sh/install | bash
