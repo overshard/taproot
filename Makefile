@@ -163,7 +163,7 @@ wsl:
 		printf 'CreateObject("WScript.Shell").Run "wsl.exe -d %s --exec sleep infinity", 0, False\r\n' "$$WSL_DISTRO_NAME" > "$$vbs"; \
 		wscript.exe "$$(wslpath -w "$$vbs")"; \
 		echo "logon starter written to $$vbs and started"; \
-	fi"
+	fi
 	@echo ""
 	$(DOCKER) run --rm --gpus all debian:trixie-slim nvidia-smi
 	@echo ""
