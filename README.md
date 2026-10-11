@@ -36,6 +36,11 @@ worst thing on this page. Its integration proxy replaces `/run/docker.sock` in
 the distro with its own and then dies along with the engine, so dockerd keeps
 running and nothing can reach it. It took a Windows reboot to clear.
 
+`make wsl` checks the socket rather than the directory, because
+`/mnt/wsl/docker-desktop` outlives an uninstall and only clears on the next
+`wsl --shutdown`. A note about that directory is not a problem. A socket that
+resolves into it is.
+
 Then inside the distro:
 
 ```sh
@@ -55,10 +60,28 @@ dockerd needs systemd as PID 1. New Debian installs already have it, and if this
 one doesn't then `make wsl` writes `[boot] systemd=true` into `/etc/wsl.conf` and
 stops, because that needs a `wsl --shutdown` from PowerShell before it takes.
 
-The Startup file is what starts the distro at logon, and systemd then starts
-docker and every container with a restart policy. At logon rather than at boot,
-so the sites come back when I sign in. A Task Scheduler task set to run whether
-logged on or not would cover the boot case if I ever want it.
+Something has to start the distro, because WSL has no autostart setting of its
+own, and systemd only takes over once the distro is up. The Startup file does it
+at sign-in, which means the sites come back when I log in rather than when the
+machine powers on.
+
+To start them at boot instead, register a Task Scheduler task from an admin
+PowerShell:
+
+```powershell
+$a = New-ScheduledTaskAction -Execute C:\Windows\System32\wsl.exe -Argument '-d Debian --exec sleep infinity'
+$t = New-ScheduledTaskTrigger -AtStartup
+$p = New-ScheduledTaskPrincipal -UserId "$env:USERNAME" -LogonType S4U -RunLevel Highest
+$s = New-ScheduledTaskSettingsSet -ExecutionTimeLimit ([TimeSpan]::Zero)
+Register-ScheduledTask -TaskName 'WSL Debian' -Action $a -Trigger $t -Principal $p -Settings $s -Force
+```
+
+`S4U` is what Task Scheduler calls "run whether the user is logged on or not"
+without storing a password, and the zero time limit matters because a task that
+runs `sleep infinity` would otherwise be killed after three days. The distro is
+registered to my user rather than to the machine, so the task has to run as me
+and not as SYSTEM. Rerunning `make wsl` after this removes the Startup file,
+since the two do the same job.
 
 `make wsl` ends by printing the Windows side it can't do from in here. All of it
 lives in `%USERPROFILE%\.wslconfig`, which WSL reads only when the VM starts, so

@@ -97,16 +97,24 @@ help:
 wsl:
 	@grep -qi microsoft /proc/version || { echo "this is for a WSL distro" >&2; exit 1; }
 # Docker Desktop's integration proxy replaces /run/docker.sock in the distro
-# with its own, then dies with the engine and leaves dockerd unreachable.
-	@test ! -d /mnt/wsl/docker-desktop || { \
-		echo "Docker Desktop's WSL integration is on for $$WSL_DISTRO_NAME, and it" >&2; \
-		echo "will replace the socket this distro's own dockerd listens on." >&2; \
-		echo "turn it off first:" >&2; \
+# with its own, then dies with the engine and leaves dockerd unreachable. Test
+# the socket rather than the directory: /mnt/wsl/docker-desktop outlives an
+# uninstall and only clears on the next wsl --shutdown.
+	@case "$$(readlink -f /var/run/docker.sock 2>/dev/null)" in \
+	/mnt/wsl/*) \
+		echo "/var/run/docker.sock belongs to Docker Desktop, not this distro." >&2; \
+		echo "turn its integration off, or dockerd here will be unreachable:" >&2; \
 		echo "" >&2; \
 		echo "  Docker Desktop -> Settings -> Resources -> WSL integration" >&2; \
 		echo "  turn off $$WSL_DISTRO_NAME and the default distro switch, apply" >&2; \
-		exit 1; \
-	}
+		exit 1 ;; \
+	esac
+	@if [ -d /mnt/wsl/docker-desktop ]; then \
+		echo "note: /mnt/wsl/docker-desktop is still mounted. harmless if Docker"; \
+		echo "Desktop is uninstalled, and it clears on the next wsl --shutdown."; \
+		echo "if it is still installed, turn its WSL integration off first."; \
+		echo ""; \
+	fi
 	@if [ "$$(cat /proc/1/comm)" != systemd ]; then \
 		grep -qs '^systemd=true' /etc/wsl.conf || printf '[boot]\nsystemd=true\n' | sudo tee -a /etc/wsl.conf >/dev/null; \
 		echo "systemd is switched on in /etc/wsl.conf. from PowerShell run:"; \
@@ -143,14 +151,19 @@ wsl:
 	printf 'APT::Periodic::Update-Package-Lists "1";\nAPT::Periodic::Unattended-Upgrade "1";\n' | \
 		sudo tee /etc/apt/apt.conf.d/20auto-upgrades >/dev/null
 	sudo systemctl enable --now unattended-upgrades.service apt-daily.timer apt-daily-upgrade.timer
-# This is what starts the distro at logon, and systemd then starts docker and
-# every container with a restart policy. Logon, not boot, so the sites come back
-# at sign-in rather than at power on.
+# Something has to start the distro, since WSL has no autostart setting of its
+# own. A boot task covers power on and a Startup file covers sign-in, so write
+# the file only when no boot task is there to do the job.
 	@startup="$$(wslpath "$$(cmd.exe /c 'echo %APPDATA%' 2>/dev/null | tr -d '\r')")/Microsoft/Windows/Start Menu/Programs/Startup"; \
 	vbs="$$startup/wsl-$$WSL_DISTRO_NAME.vbs"; \
-	printf 'CreateObject("WScript.Shell").Run "wsl.exe -d %s --exec sleep infinity", 0, False\r\n' "$$WSL_DISTRO_NAME" > "$$vbs"; \
-	wscript.exe "$$(wslpath -w "$$vbs")"; \
-	echo "logon starter written to $$vbs and started"
+	if schtasks.exe /query /tn "WSL $$WSL_DISTRO_NAME" >/dev/null 2>&1; then \
+		rm -f "$$vbs"; \
+		echo "the boot task starts $$WSL_DISTRO_NAME, so no logon file is needed"; \
+	else \
+		printf 'CreateObject("WScript.Shell").Run "wsl.exe -d %s --exec sleep infinity", 0, False\r\n' "$$WSL_DISTRO_NAME" > "$$vbs"; \
+		wscript.exe "$$(wslpath -w "$$vbs")"; \
+		echo "logon starter written to $$vbs and started"; \
+	fi"
 	@echo ""
 	$(DOCKER) run --rm --gpus all debian:trixie-slim nvidia-smi
 	@echo ""
@@ -186,6 +199,17 @@ wsl:
 	@echo "    wsl --manage $$WSL_DISTRO_NAME --move D:\\WSL\\$$WSL_DISTRO_NAME"
 	@echo "  then wsl --shutdown once more, since the move starts the VM before"
 	@echo "  the new directory exists and swap fails to come up the first time."
+	@echo ""
+	@echo "  the sites come back at sign-in, not at power on. to start them at"
+	@echo "  boot instead, from an ADMIN PowerShell:"
+	@echo ""
+	@echo "    \$$a = New-ScheduledTaskAction -Execute C:\\Windows\\System32\\wsl.exe -Argument '-d $$WSL_DISTRO_NAME --exec sleep infinity'"
+	@echo "    \$$t = New-ScheduledTaskTrigger -AtStartup"
+	@echo "    \$$p = New-ScheduledTaskPrincipal -UserId \"\$$env:USERNAME\" -LogonType S4U -RunLevel Highest"
+	@echo "    \$$s = New-ScheduledTaskSettingsSet -ExecutionTimeLimit ([TimeSpan]::Zero)"
+	@echo "    Register-ScheduledTask -TaskName 'WSL $$WSL_DISTRO_NAME' -Action \$$a -Trigger \$$t -Principal \$$p -Settings \$$s -Force"
+	@echo ""
+	@echo "  then rerun make wsl and it removes the logon file as redundant."
 	@echo ""
 	@echo "then: make install"
 
