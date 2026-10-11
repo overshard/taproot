@@ -136,6 +136,13 @@ wsl:
 	sudo nvidia-ctk runtime configure --runtime=docker
 	sudo systemctl enable --now docker
 	sudo usermod -aG docker $$USER
+# Security updates apply themselves. Debian's default origin list is only
+# trixie-security, so docker and the toolkit are left for a deliberate apt
+# upgrade rather than restarting the daemon under the running containers.
+	sudo apt-get install -y unattended-upgrades
+	printf 'APT::Periodic::Update-Package-Lists "1";\nAPT::Periodic::Unattended-Upgrade "1";\n' | \
+		sudo tee /etc/apt/apt.conf.d/20auto-upgrades >/dev/null
+	sudo systemctl enable --now unattended-upgrades.service apt-daily.timer apt-daily-upgrade.timer
 # This is what starts the distro at logon, and systemd then starts docker and
 # every container with a restart policy. Logon, not boot, so the sites come back
 # at sign-in rather than at power on.
@@ -391,7 +398,7 @@ llm-key:
 	}
 	@$(DOCKER) volume create bythewood-llm >/dev/null
 	@printf '%s' "$(KEY)" | $(DOCKER) run --rm -i \
-		--volume bythewood-llm:/k alpine:3 \
+		--volume bythewood-llm:/k debian:trixie-slim \
 		sh -c 'cat > /k/key && chmod 600 /k/key && chown 1001:1001 /k/key'
 	@echo "key stored. it takes effect on the next: make update C=aiagent"
 
