@@ -199,17 +199,22 @@ wsl:
 	@echo "    wsl --manage $$WSL_DISTRO_NAME --move D:\\WSL\\$$WSL_DISTRO_NAME"
 	@echo "  then wsl --shutdown once more, since the move starts the VM before"
 	@echo "  the new directory exists and swap fails to come up the first time."
-	@echo ""
-	@echo "  the sites come back at sign-in, not at power on. to start them at"
-	@echo "  boot instead, from an ADMIN PowerShell:"
-	@echo ""
-	@echo "    \$$a = New-ScheduledTaskAction -Execute C:\\Windows\\System32\\wsl.exe -Argument '-d $$WSL_DISTRO_NAME --exec sleep infinity'"
-	@echo "    \$$t = New-ScheduledTaskTrigger -AtStartup"
-	@echo "    \$$p = New-ScheduledTaskPrincipal -UserId \"\$$env:USERNAME\" -LogonType S4U -RunLevel Highest"
-	@echo "    \$$s = New-ScheduledTaskSettingsSet -ExecutionTimeLimit ([TimeSpan]::Zero)"
-	@echo "    Register-ScheduledTask -TaskName 'WSL $$WSL_DISTRO_NAME' -Action \$$a -Trigger \$$t -Principal \$$p -Settings \$$s -Force"
-	@echo ""
-	@echo "  then rerun make wsl and it removes the logon file as redundant."
+	@if schtasks.exe /query /tn "WSL $$WSL_DISTRO_NAME" >/dev/null 2>&1; then \
+		echo "  the 'WSL $$WSL_DISTRO_NAME' task starts the sites at boot, before sign-in."; \
+		echo "  remove it with: schtasks.exe /delete /tn \"WSL $$WSL_DISTRO_NAME\" /f"; \
+	else \
+		echo ""; \
+		echo "  the sites come back at sign-in, not at power on. to start them at"; \
+		echo "  boot instead, from an ADMIN PowerShell:"; \
+		echo ""; \
+		echo "    \$$a = New-ScheduledTaskAction -Execute C:\\Windows\\System32\\wsl.exe -Argument '-d $$WSL_DISTRO_NAME --exec sleep infinity'"; \
+		echo "    \$$t = New-ScheduledTaskTrigger -AtStartup"; \
+		echo "    \$$p = New-ScheduledTaskPrincipal -UserId \"\$$env:USERNAME\" -LogonType S4U -RunLevel Highest"; \
+		echo "    \$$s = New-ScheduledTaskSettingsSet -ExecutionTimeLimit ([TimeSpan]::Zero)"; \
+		echo "    Register-ScheduledTask -TaskName 'WSL $$WSL_DISTRO_NAME' -Action \$$a -Trigger \$$t -Principal \$$p -Settings \$$s -Force"; \
+		echo ""; \
+		echo "  then rerun make wsl and it removes the logon file as redundant."; \
+	fi
 	@echo ""
 	@echo "then: make install"
 

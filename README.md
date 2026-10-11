@@ -81,7 +81,14 @@ without storing a password, and the zero time limit matters because a task that
 runs `sleep infinity` would otherwise be killed after three days. The distro is
 registered to my user rather than to the machine, so the task has to run as me
 and not as SYSTEM. Rerunning `make wsl` after this removes the Startup file,
-since the two do the same job.
+since the two do the same job, and from then on it reports the task instead of
+telling me how to make one. To go back to starting at sign-in:
+
+```powershell
+schtasks.exe /delete /tn "WSL Debian" /f
+```
+
+then rerun `make wsl` and it writes the Startup file again.
 
 `make wsl` ends by printing the Windows side it can't do from in here. All of it
 lives in `%USERPROFILE%\.wslconfig`, which WSL reads only when the VM starts, so
