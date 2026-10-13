@@ -34,7 +34,8 @@ NAME   = bythewood-$(C)
 IMAGE  = $(REGISTRY)/$(C):latest
 WEBDEV = bythewood-webdev
 
-RUN_webdev = --detach --name bythewood-webdev --init --restart unless-stopped \
+RUN_webdev = --detach --name bythewood-webdev --hostname bythewood-webdev --init \
+	--restart unless-stopped \
 	--publish 8000:8000 \
 	--volume bythewood-code:/home/dev/code \
 	--volume bythewood-claude:/home/dev/.claude \
@@ -278,7 +279,7 @@ up: require-container
 update: require-container
 	$(DOCKER) build --pull --tag $(IMAGE) -f containers/$(C)/Dockerfile .
 	@self=$$(cat /etc/hostname 2>/dev/null); \
-	target=$$($(DOCKER) inspect --format '{{.Id}}' $(NAME) 2>/dev/null | cut -c1-12); \
+	target=$$($(DOCKER) inspect --format '{{.Config.Hostname}}' $(NAME) 2>/dev/null); \
 	if [ -n "$$target" ] && [ "$$self" = "$$target" ]; then \
 		echo ""; \
 		echo "replacing the container you are sitting in."; \
