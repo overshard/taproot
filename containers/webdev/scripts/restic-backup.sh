@@ -14,6 +14,7 @@
 # name at any depth, and cargo's target/ dirs go by --exclude-caches instead,
 # since cargo writes a CACHEDIR.TAG into each one. orchard/bin is excluded by
 # full path because a bare 'bin' would also drop src/bin trees, which are source.
+# A directory holding a .nobackup file is skipped, for data that stays local.
 #
 # Credentials live in ~/.restic/, mounted from the bythewood-restic volume, and
 # restic-setup is what writes them:
@@ -45,6 +46,7 @@ restic backup \
     --verbose \
     --host="$RESTIC_HOST" \
     --exclude-caches \
+    --exclude-if-present=.nobackup \
     --exclude='node_modules' \
     --exclude='.next' \
     --exclude='.venv' \
