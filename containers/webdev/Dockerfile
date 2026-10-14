@@ -37,8 +37,10 @@ ENV DEBIAN_FRONTEND=noninteractive \
 
 # Docker's repo, not Debian's, since trixie has no docker-compose-v2 package.
 # Client only, never the daemon. jq is required by code-sync, and there is no
-# pip or python3-venv because uv covers both.
+# pip or python3-venv because uv covers both. The upgrade is what brings in
+# Debian's security fixes, since the base above is pinned by digest.
 RUN apt-get update && \
+    apt-get upgrade -y && \
     apt-get install -y --no-install-recommends ca-certificates curl && \
     install -m 0755 -d /etc/apt/keyrings && \
     curl -fsSL https://download.docker.com/linux/debian/gpg -o /etc/apt/keyrings/docker.asc && \
@@ -63,8 +65,8 @@ RUN ln -sf /usr/local/bin/bun /usr/local/bin/node && \
     node /tmp/shim.js && rm /tmp/shim.js
 
 # Upstream tarball, not apt, which lags releases.
-ARG GO_VERSION=1.27.0
-ARG GO_SHA256=675c26c449cbb18fc24b74650de1eabbae6e16f64326fd85a283fb3b58280685
+ARG GO_VERSION=1.27.2
+ARG GO_SHA256=ecbadb99091a3f46e31f5f934b068b1864eafa7995211b39eaddf76996045fe5
 RUN curl -fsSLO "https://go.dev/dl/go${GO_VERSION}.linux-amd64.tar.gz" && \
     echo "${GO_SHA256}  go${GO_VERSION}.linux-amd64.tar.gz" | sha256sum -c - && \
     tar -C /usr/local -xzf "go${GO_VERSION}.linux-amd64.tar.gz" && \
