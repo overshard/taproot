@@ -48,7 +48,7 @@ case "${1:-}" in
     # The password alone on stdout and the note on stderr, so it pipes cleanly.
     gen_password
     echo "" >&2
-    echo "a suggestion, nothing was written. put it in 1Password." >&2
+    echo "a suggestion, nothing was written. put it in Bitwarden." >&2
     exit 0 ;;
 --help|-h) usage; exit 0 ;;
 "") ;;
@@ -146,7 +146,7 @@ cat <<'GUIDE'
 ------------------------------------------------------------------------
 where these come from
 
-  Everything is in 1Password first. Look for the Backblaze B2 item (the
+  Everything is in Bitwarden first. Look for the Backblaze B2 item (the
   application key) and the restic repository password. If both are there,
   paste them below and you are done.
 
@@ -164,7 +164,7 @@ where these come from
 
     3. Save it. The keyID and the applicationKey are shown ONCE. The
        keyID is B2_ACCOUNT_ID, the applicationKey is B2_ACCOUNT_KEY.
-       Put both back into 1Password before you close the page.
+       Put both back into Bitwarden before you close the page.
 
   The repo password is NOT recoverable. If it is lost, the snapshots in
   that repository are lost with it, and the only fix is a new repository.
@@ -227,7 +227,7 @@ else
     echo ""
     echo "    $SUGGESTED"
     echo ""
-    echo "press enter to take it, and put it in 1Password now, because it is"
+    echo "press enter to take it, and put it in Bitwarden now, because it is"
     echo "not recoverable and nothing else has a copy. if this machine is"
     echo "joining backups that already exist, paste that repository's own"
     echo "password over it instead, since a new one will not open it."
