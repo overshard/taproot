@@ -245,7 +245,7 @@ snapshot. That last step matters because not everything under `~/code`
 has a git remote to pull from, so restic is the only copy of it.
 
 The credentials step offers a generated repo password if there isn't one yet, so
-there's nothing to invent. Take it with enter and put it in 1Password before you
+there's nothing to invent. Take it with enter and put it in Bitwarden before you
 move on, because it isn't recoverable. If the machine is joining backups that
 already exist, paste that repository's own password instead. `make password`
 prints a fresh suggestion any time, and writes nothing.
@@ -307,7 +307,7 @@ is idempotent and repairs as readily as it installs.
 | `stop` | Stop it without replacing anything |
 | `key` | Copy the git ssh key in from this machine |
 | `restic` | Enter or repair the B2 backup credentials |
-| `password` | Print a suggested password to paste into 1Password |
+| `password` | Print a suggested password to paste into Bitwarden |
 | `backup` | Take a restic snapshot now |
 | `snapshots` | Last snapshot per host, and what the repo costs |
 | `restore` | Pull everything back from the latest snapshot |
@@ -407,7 +407,7 @@ make serve MODEL=<hf-repo>:<quant>
 
 The webdev container backs up to a Backblaze B2 bucket (`overshard-backups`)
 using restic. Retention is 7 daily, 4 weekly and 6 monthly per host, pruned
-after each backup. Passwords and B2 keys live in 1Password.
+after each backup. Passwords and B2 keys live in Bitwarden.
 
 There is one repository, `b2:overshard-backups:webdev`, holding per-machine
 snapshots of `~/.claude`, `~/code` and `~/.ssh` from desktop and laptop, each
@@ -424,7 +424,7 @@ make restore    # existing data moves to .before-restore-<UTC>/ inside each volu
 ```
 
 **NOTE:** the repo password is not recoverable. Lose it and the snapshots in
-that repository are lost with it. It lives in 1Password.
+that repository are lost with it. It lives in Bitwarden, and on the paper in the safe.
 
 ## Things that will bite you
 

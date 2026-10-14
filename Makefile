@@ -74,7 +74,7 @@ help:
 	@echo ""
 	@echo "make key            copy the git ssh key in from this machine"
 	@echo "make restic         enter or repair the B2 backup credentials"
-	@echo "make password       print a suggested password to paste into 1Password"
+	@echo "make password       print a suggested password to paste into Bitwarden"
 	@echo ""
 	@echo "make backup         take a restic snapshot now"
 	@echo "make snapshots      last snapshot per host, and what the repo costs"
