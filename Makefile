@@ -284,8 +284,10 @@ up: require-container
 #
 # Nothing below may contain $$(MAKE). GNU make runs any recipe line carrying
 # that string even under `-n`, so a dry run would really replace the container.
+# --no-cache because the base is pinned by digest, so without it the apt layer
+# is reused and Debian's security fixes never arrive.
 update: require-container
-	$(DOCKER) build --pull --tag $(IMAGE) -f containers/$(C)/Dockerfile .
+	$(DOCKER) build --no-cache --tag $(IMAGE) -f containers/$(C)/Dockerfile .
 	@self=$$(cat /etc/hostname 2>/dev/null); \
 	target=$$($(DOCKER) inspect --format '{{.Config.Hostname}}' $(NAME) 2>/dev/null); \
 	if [ -n "$$target" ] && [ "$$self" = "$$target" ]; then \

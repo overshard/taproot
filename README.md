@@ -279,7 +279,9 @@ A new tool in the Dockerfile, a dotfile edit, a Debian update worth picking up:
 make update
 ```
 
-This rebuilds and replaces. It works from inside the container it is replacing,
+This rebuilds from scratch, so Debian's security fixes and the newest of
+everything that isn't pinned come in with it, and then replaces. It takes a few
+minutes for that reason. It works from inside the container it is replacing,
 so your shell drops for a couple of seconds and
 `docker exec -it bythewood-webdev tmux` from the host brings you back. Volumes
 are untouched.
