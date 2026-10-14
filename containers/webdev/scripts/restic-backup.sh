@@ -2,7 +2,8 @@
 #
 # restic-backup.sh
 #
-# Run manually to back up this container to Backblaze B2 via restic. It
+# Backs up this container to Backblaze B2 via restic. The host's
+# restic-backup.timer runs it nightly and make backup runs it by hand. It
 # initializes the repo on first run and prunes to 7 daily, 4 weekly and 6
 # monthly after each successful backup.
 #

@@ -58,7 +58,7 @@ RUN_ARGS = $(RUN_$(C))
 .NOTPARALLEL:
 
 .PHONY: help wsl install up update doctor shell build stop key restic password \
-	backup snapshots restore sync dotfiles models serve llm-key \
+	backup verify snapshots restore sync dotfiles models serve llm-key \
 	require-container require-webdev
 
 help:
@@ -77,6 +77,7 @@ help:
 	@echo "make password       print a suggested password to paste into Bitwarden"
 	@echo ""
 	@echo "make backup         take a restic snapshot now"
+	@echo "make verify         read back 5% of the backup to prove it restores"
 	@echo "make snapshots      last snapshot per host, and what the repo costs"
 	@echo "make restore        pull everything back from the latest snapshot"
 	@echo "make sync           pull every repo under ~/code, clone any new ones"
@@ -158,15 +159,22 @@ wsl:
 	printf 'APT::Periodic::Update-Package-Lists "1";\nAPT::Periodic::Unattended-Upgrade "1";\n' | \
 		sudo tee /etc/apt/apt.conf.d/20auto-upgrades >/dev/null
 	sudo systemctl enable --now unattended-upgrades.service apt-daily.timer apt-daily-upgrade.timer
-# The backup was manual, so a week could pass between snapshots without anyone
-# noticing. Persistent catches up a run the machine slept through, and it is a
-# host timer rather than a container one so it survives webdev being replaced.
-	printf '[Unit]\nDescription=restic backup of the webdev volumes\nAfter=docker.service\nRequires=docker.service\n\n[Service]\nType=oneshot\nExecStart=/usr/bin/docker exec bythewood-webdev restic-backup\n' | \
+# Persistent catches up a run the machine slept through, and these are host
+# timers rather than container ones so they survive webdev being replaced. A
+# failed backup or check pushes an alert to the phone through restic-alert.
+# Undo with: sudo systemctl disable --now restic-backup.timer restic-check.timer
+	printf '[Unit]\nDescription=restic backup of the webdev volumes\nAfter=docker.service\nRequires=docker.service\nOnFailure=restic-alert@%%n.service\n\n[Service]\nType=oneshot\nExecStart=/usr/bin/docker exec bythewood-webdev restic-backup\n' | \
 		sudo tee /etc/systemd/system/restic-backup.service >/dev/null
 	printf '[Unit]\nDescription=daily restic backup\n\n[Timer]\nOnCalendar=daily\nPersistent=true\nRandomizedDelaySec=30m\n\n[Install]\nWantedBy=timers.target\n' | \
 		sudo tee /etc/systemd/system/restic-backup.timer >/dev/null
+	printf '[Unit]\nDescription=read back a sample of the restic repo\nAfter=docker.service\nRequires=docker.service\nOnFailure=restic-alert@%%n.service\n\n[Service]\nType=oneshot\nExecStart=/usr/bin/docker exec bythewood-webdev restic-check\n' | \
+		sudo tee /etc/systemd/system/restic-check.service >/dev/null
+	printf '[Unit]\nDescription=weekly restic check\n\n[Timer]\nOnCalendar=Sun 12:00\nPersistent=true\nRandomizedDelaySec=30m\n\n[Install]\nWantedBy=timers.target\n' | \
+		sudo tee /etc/systemd/system/restic-check.timer >/dev/null
+	printf '[Unit]\nDescription=phone alert for a failed %%i\n\n[Service]\nType=oneshot\nExecStart=/usr/bin/docker exec bythewood-webdev restic-alert %%i\n' | \
+		sudo tee /etc/systemd/system/restic-alert@.service >/dev/null
 	sudo systemctl daemon-reload
-	sudo systemctl enable --now restic-backup.timer
+	sudo systemctl enable --now restic-backup.timer restic-check.timer
 # Something has to start the distro, since WSL has no autostart setting of its
 # own. A boot task covers power on and a Startup file covers sign-in, so write
 # the file only when no boot task is there to do the job.
@@ -344,6 +352,11 @@ doctor:
 	127) echo "  restic          unknown  -> image predates restic-setup, run: make update" ;; \
 	*)   echo "  restic          NOT SET UP  -> make restic" ;; \
 	esac; \
+	if age=$$($(DOCKER) exec $(WEBDEV) restic-status --age 2>/dev/null); then \
+		echo "  last backup     $$age"; \
+	else \
+		echo "  last backup     $${age:-unknown}, over 2 days  -> make backup, then: journalctl -u restic-backup"; \
+	fi; \
 	if $(DOCKER) exec $(WEBDEV) test -L /home/dev/.claude/skills 2>/dev/null; then \
 		echo "  claude dotfiles ok"; \
 	else \
@@ -397,6 +410,9 @@ password:
 
 backup: require-webdev
 	@$(DOCKER) exec $(WEBDEV) restic-backup
+
+verify: require-webdev
+	@$(DOCKER) exec $(WEBDEV) restic-check
 
 snapshots: require-webdev
 	@$(DOCKER) exec $(WEBDEV) restic-status

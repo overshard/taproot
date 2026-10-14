@@ -309,6 +309,7 @@ is idempotent and repairs as readily as it installs.
 | `restic` | Enter or repair the B2 backup credentials |
 | `password` | Print a suggested password to paste into Bitwarden |
 | `backup` | Take a restic snapshot now |
+| `verify` | Read back 5% of the backup to prove it restores |
 | `snapshots` | Last snapshot per host, and what the repo costs |
 | `restore` | Pull everything back from the latest snapshot |
 | `sync` | Pull every repo under `~/code`, clone any new ones |
@@ -374,9 +375,11 @@ there:
 | Command | Target | What it does |
 |---|---|---|
 | `restic-setup`   | `make restic` | Check the B2 credentials, and walk through entering them if they are missing or wrong |
-| `restic-backup`  | `make backup` | Manual restic backup to B2, snapshot tagged with `$RESTIC_HOST` |
+| `restic-backup`  | `make backup` | Restic backup to B2, run nightly by the host timer, snapshot tagged with `$RESTIC_HOST` |
+| `restic-check`   | `make verify` | Read back 5% of the repo, run weekly by the host timer |
+| `restic-alert`   | | Push a phone alert through ntfy, called when either timer fails |
 | `restic-restore` | `make restore` | Pull latest snapshot from B2, existing data archived first |
-| `restic-status`  | `make snapshots` | Last snapshot per host, plus repo size |
+| `restic-status`  | `make snapshots` | Last snapshot per host, plus repo size. `--age` is what doctor uses |
 | `code-sync`      | `make sync` | Pull every repo under `~/code/`, then clone any new ones from GitHub |
 
 In `aiagent`, `webdev-exec` runs a command over in `webdev` against the same
@@ -406,8 +409,11 @@ make serve MODEL=<hf-repo>:<quant>
 ## Backups
 
 The webdev container backs up to a Backblaze B2 bucket (`overshard-backups`)
-using restic. Retention is 7 daily, 4 weekly and 6 monthly per host, pruned
-after each backup. Passwords and B2 keys live in Bitwarden.
+using restic. A systemd timer on the host runs it nightly and a second one
+reads back 5% of the repo every Sunday. Either one failing sends a high
+priority alert to the status topic on the phone, and `make doctor` says how old
+the last snapshot is. Retention is 7 daily, 4 weekly and 6 monthly per host,
+pruned after each backup. Passwords and B2 keys live in Bitwarden.
 
 There is one repository, `b2:overshard-backups:webdev`, holding per-machine
 snapshots of `~/.claude`, `~/code` and `~/.ssh` from desktop and laptop, each
@@ -419,6 +425,7 @@ opening the repository, prompts for anything missing, and writes both files at
 
 ```sh
 make backup     # take a snapshot from this machine
+make verify     # read back 5% of it
 make snapshots  # check the repo from anywhere
 make restore    # existing data moves to .before-restore-<UTC>/ inside each volume first
 ```

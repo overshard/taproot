@@ -5,6 +5,9 @@
 # Show backup health for the webdev restic repo: the latest snapshot for each
 # machine that backs up to it, and what it costs in B2.
 #
+# --age prints how old this machine's last snapshot is, for make doctor, and
+# exits 1 past two days.
+#
 # Files used:
 #   ~/.restic/b2-env    B2 account creds (required)
 #   ~/.restic/password  repo password (required)
@@ -19,6 +22,19 @@ PW_FILE="$HOME/.restic/password"
 
 export RESTIC_REPOSITORY="$REPO"
 export RESTIC_PASSWORD_FILE="$PW_FILE"
+
+if [ "${1:-}" = "--age" ]; then
+    latest=$(restic snapshots --host "$RESTIC_HOST" --group-by host --latest 1 --json 2>/dev/null \
+        | sed -n 's/.*"time":"\([^"]*\)".*/\1/p' | head -n 1)
+    if [ -z "$latest" ]; then
+        echo "no snapshot for $RESTIC_HOST"
+        exit 1
+    fi
+    hours=$(( ($(date +%s) - $(date -d "$latest" +%s)) / 3600 ))
+    echo "${hours}h ago"
+    [ "$hours" -le 48 ]
+    exit
+fi
 
 # b2-env exports RESTIC_HOST for restic-backup's --host tag, but restic also
 # honours it as the --host filter on read commands, so leaving it set quietly
