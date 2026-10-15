@@ -22,9 +22,8 @@ or done halfway.
 ## The vault
 
 `~/code/memory` is plain Markdown, no database, Obsidian-compatible, **local-only git**
-(no remote). It is separate from the built-in Claude auto-memory at
-`~/.claude/projects/-home-dev/memory/` (terse hot facts auto-loaded every session). The
-vault is the richer, narrative, version-controlled record. Layout:
+(no remote). It's the only memory there is, since Claude Code's built-in auto-memory is
+switched off, so nothing gets recalled unless it's written here. Layout:
 
 ```
 journal/   YYYY-MM-DD.md   dated session logs: what we did/decided/discussed
