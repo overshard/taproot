@@ -37,8 +37,8 @@ PowerShell:
 wsl --install -d Debian
 ```
 
-and set up `%USERPROFILE%\.wslconfig` and the boot task as **The Windows host**
-in the README describes.
+and set up `%USERPROFILE%\.wslconfig` and the boot task as [wsl.md](wsl.md)
+describes.
 
 ## 2. The Debian host, about 10 minutes
 

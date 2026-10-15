@@ -13,7 +13,7 @@
 #     make shell       get in, via tmux
 #
 # A machine that has never run this needs Docker, then one command, which the
-# README shows running from a throwaway container when the host has no make:
+# docs/recovery.md shows running from a throwaway container when there's no make:
 #
 #     make install     the above, plus the key, the B2 credentials and a restore
 #
