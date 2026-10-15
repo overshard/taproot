@@ -16,6 +16,8 @@
 # since cargo writes a CACHEDIR.TAG into each one. orchard/bin is excluded by
 # full path because a bare 'bin' would also drop src/bin trees, which are source.
 # A directory holding a .nobackup file is skipped, for data that stays local.
+# Claude Code's background jobs keep scratch under jobs/*/tmp, which has held
+# gigabytes of core dumps and copied databases.
 #
 # Credentials live in ~/.restic/, mounted from the bythewood-restic volume, and
 # restic-setup is what writes them:
@@ -59,6 +61,8 @@ restic backup \
     --exclude='.vite' \
     --exclude='*.pyc' \
     --exclude='.before-restore-*' \
+    --exclude='.tmp' \
+    --exclude="$HOME/.claude/jobs/*/tmp" \
     "$HOME/.claude" \
     "$HOME/code" \
     "$HOME/.ssh" || backup_exit=$?
