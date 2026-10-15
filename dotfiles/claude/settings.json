@@ -17,5 +17,9 @@
   "verbose": true,
   "remoteControlAtStartup": false,
   "agentPushNotifEnabled": false,
-  "tui": "fullscreen"
+  "tui": "fullscreen",
+  "attribution": {
+    "commit": "",
+    "pr": ""
+  }
 }
