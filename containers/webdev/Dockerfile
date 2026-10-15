@@ -147,7 +147,7 @@ RUN mkdir -p /home/dev/code /home/dev/.claude /home/dev/.ssh /home/dev/.restic &
     chmod +x /home/dev/scripts/* && \
     echo "source ~/.bash_aliases" >> /home/dev/.bashrc && \
     ln -s /home/dev/.claude/.claude.json /home/dev/.claude.json && \
-    ln -s code/CLAUDE.md /home/dev/CLAUDE.md && \
+    ln -s code/memory/workspace.md /home/dev/CLAUDE.md && \
     printf '%s\n' \
     'Host *' \
     '  IdentityFile ~/.ssh/home_key' \
