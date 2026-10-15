@@ -1,5 +1,6 @@
 ---
 name: roundup
+disable-model-invocation: true
 description: Fast, spin-stripped news + markets briefing for Isaac, delivered as a diff since the last roundup. Invoke when Isaac says "roundup", asks "what's new / what did I miss", or wants a quick news/markets catch-up. Fans out across the political spectrum (NPR/BBC/CNN/Fox/Google News/AP/Reuters), market data (indexes/crypto/commodities), local NC, work-talk sports (NASCAR/F1/soccer), PC gaming (big releases + hyped indies), and watercooler feeds (Hacker News), filters hard to only what matters, and reads the previous roundup from code/memory/roundups/ to report only what changed, then saves and commits the new one.
 ---
 

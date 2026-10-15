@@ -13,15 +13,11 @@ you read only the snapshot lines you need. Same browser, far cheaper context.
 The webdev container already ships Playwright Chromium at `/opt/playwright-browsers`
 (symlinked to `/opt/google/chrome/chrome`), so no extra browser download is needed.
 
-## Setup (one-time, per machine)
+## Setup
 
-```bash
-playwright-cli --version || npm install -g @playwright/cli
-```
-
-If it is missing and `npm` is unavailable, install via the project's JS toolchain or
-add it to the webdev Dockerfile (see `~/code/taproot/containers/webdev/Dockerfile`,
-near the existing Playwright Chromium step).
+The webdev Dockerfile installs `@playwright/cli` with bun, pinned by version, so it's
+already on PATH. If `playwright-cli --version` fails the image is old, and `make update`
+in taproot fixes it.
 
 ## Core workflow
 
@@ -49,7 +45,8 @@ the CLI over the MCP.
 
 ## Notes for this workspace
 
-- Every app in this workspace serves on **port 8000** in dev (`make run`). Log in at
-  `/login` where the app has auth (analytics, status, finance).
+- Every app in this workspace serves on **port 8000** in dev (`make run`). The gated
+  orchard sites sign in through auth.bythewood.me, so a dev run of one of them needs a
+  session cookie from there or a page that isn't behind it.
 - Good uses here: confirm a rendered template change, screenshot a chart/map/PDF page,
   walk a multi-step form, or record a flow to scaffold a test.
