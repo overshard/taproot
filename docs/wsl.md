@@ -100,6 +100,29 @@ The second shutdown isn't a typo. The move starts the VM a few seconds before it
 creates the new directory, so swap fails to come up that first time and the
 Windows event log says it cannot find the path.
 
+The vhdx grows and never shrinks on its own, so deleting a volume frees space
+inside the distro and none on D:. To give it back, trim inside the distro first
+so the freed blocks are marked, then compact from an admin PowerShell:
+
+```sh
+sudo fstrim -av
+```
+
+```powershell
+wsl --shutdown
+diskpart
+select vdisk file="D:\WSL\Debian\ext4.vhdx"
+attach vdisk readonly
+compact vdisk
+detach vdisk
+exit
+```
+
+`Optimize-VHD -Path D:\WSL\Debian\ext4.vhdx -Mode Full` does the same thing but
+needs the Hyper-V module, which Windows Home doesn't have. Newer WSL can also
+do it on its own with `wsl --manage Debian --set-sparse true`, which I haven't
+turned on since it was marked experimental, and `--set-sparse false` undoes it.
+
 A long job stopping halfway for a sudo password is worth avoiding, so:
 
 ```sh
