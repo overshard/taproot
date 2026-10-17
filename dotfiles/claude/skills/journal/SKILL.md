@@ -5,48 +5,45 @@ description: Wrap the current session into the git-versioned memory vault at cod
 
 # Journal / memory wrap
 
-The full, authoritative contract lives in `~/code/memory/CLAUDE.md`. Read it if you
-need detail. This skill is the quick operational checklist so a wrap is never skipped
-or done halfway.
+The full contract lives in `~/code/memory/CLAUDE.md`. This is the quick checklist so a wrap
+is never skipped or done halfway.
 
 ## When to run
 
-- **Trigger words.** Isaac saying "journal" or "memory" alone means the session is
-  wrapping and he is moving on. Do the full wrap immediately, from whatever context
-  the session has. Do not wait to be asked twice.
-- **After each meaningful unit of work**, not only at session end: a task or subtask
-  wrapping, a notable decision, a commit or deploy, or a real discussion (including
-  non-engineering: a question answered, a topic thought through, a preference
-  expressed). Capture it while fresh and do not batch the whole session into one entry.
+- When Isaac says "journal" or "memory" on its own. The session is wrapping, so do the full
+  wrap right away from whatever context the session has.
+- After each meaningful unit of work, while it's fresh: a task wrapping, a decision, a commit
+  or deploy, or a real discussion on any topic. Don't batch the whole session into one entry.
 
 ## The vault
 
-`~/code/memory` is plain Markdown, no database, Obsidian-compatible, **local-only git**
-(no remote). It's the only memory there is, since Claude Code's built-in auto-memory is
-switched off, so nothing gets recalled unless it's written here. Layout:
-
-```
-journal/   YYYY-MM-DD.md   dated session logs: what we did/decided/discussed
-projects/  one living note per workspace project: state, open threads
-decisions/ ADR-style records for notable choices, with rationale
-topics/    evergreen concept/reference articles
-people/    profiles for the owner and recurring people
-index.md   master retrieval map: one line per note
-```
+`~/code/memory` is plain Markdown in a local-only git repo with no remote, and it's the only
+memory there is. `journal/` holds dated entries, `projects/` one note per project describing
+how it works today, `decisions/` ADRs with a Status line, `topics/` reference articles,
+`people/` profiles, and `index.md` one line per note.
 
 ## Steps
 
-1. **Append to today's journal** `~/code/memory/journal/YYYY-MM-DD.md` (create if
-   absent). Add a section with a short timestamp heading covering: what we did, what we
-   decided, anything discussed worth remembering, and open threads for next time.
-2. **Update the relevant note** in `projects/`, `decisions/`, or `topics/` if project
-   state changed or a notable choice was settled. Create a new note when a durable topic
-   or decision emerges.
-3. **Update `index.md`** whenever a note is *added* (one line: `- [[slug]]: one-line hook`).
-4. Capture **why**, not just what, since the diff already records what. Link related
-   notes liberally with `[[wikilinks]]` (filename without extension), since a link to a
-   not-yet-written note is fine, it marks something worth writing later.
-5. **Commit** (no `Co-Authored-By` trailer, present tense, `memory:` prefix):
+1. Append to `~/code/memory/journal/YYYY-MM-DD.md` (create it if absent) in this shape, leaving
+   out any part that's empty:
+
+   ```markdown
+   ## 14:30 short title
+
+   **Did**
+   - one fact per line, a commit hash where there is one
+   **Decided**
+   - what was settled, and why
+   **Open**
+   - what's left, and who or what it waits on
+   ```
+
+   Keep lines short. Anything that needs a paragraph goes in the project or topic note.
+2. Update the note the work changed so it reads as current state, rather than adding a dated
+   section to it. Create a note when a durable topic or decision comes out of the work, and
+   bump the Status line on an ADR a new decision amends or supersedes.
+3. Add a line to `index.md` for any new note, `- [[slug]]: hook` in about 80 to 120 characters.
+4. Commit, with no `Co-Authored-By` trailer:
 
    ```
    git -C ~/code/memory add -A && git -C ~/code/memory commit -m "memory: <short summary>"
@@ -54,7 +51,7 @@ index.md   master retrieval map: one line per note
 
 ## Conventions
 
-- No em dashes, en dashes or semicolons. Use commas, periods, or parentheses.
-- Frontmatter on every note: `title`, `type` (journal|project|decision|topic|person),
-  `created`, `updated`, `tags`. Filenames lowercase kebab-case, journals `YYYY-MM-DD.md`.
-- Convert relative dates ("next week") to absolute dates when recording.
+- No em dashes, en dashes or semicolons.
+- Frontmatter on every note: `title`, `type`, `created`, `updated`, `tags`. Filenames are
+  lowercase kebab-case, journals `YYYY-MM-DD.md`, and links are `[[filename]]`.
+- Turn relative dates into absolute ones.
