@@ -65,8 +65,8 @@ RUN ln -sf /usr/local/bin/bun /usr/local/bin/node && \
     node /tmp/shim.js && rm /tmp/shim.js
 
 # Upstream tarball, not apt, which lags releases.
-ARG GO_VERSION=1.27.2
-ARG GO_SHA256=ecbadb99091a3f46e31f5f934b068b1864eafa7995211b39eaddf76996045fe5
+ARG GO_VERSION=1.27.3
+ARG GO_SHA256=65efbc80fdc1fa2cd2631cad5b481777a68e8725f34e89f50fc6ac714e379b40
 RUN curl -fsSLO "https://go.dev/dl/go${GO_VERSION}.linux-amd64.tar.gz" && \
     echo "${GO_SHA256}  go${GO_VERSION}.linux-amd64.tar.gz" | sha256sum -c - && \
     tar -C /usr/local -xzf "go${GO_VERSION}.linux-amd64.tar.gz" && \
