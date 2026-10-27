@@ -13,11 +13,18 @@
     "command": "bash ~/.claude/status-line.sh"
   },
   "effortLevel": "high",
-  "skipDangerousModePermissionPrompt": true,
-  "verbose": true,
-  "remoteControlAtStartup": false,
-  "agentPushNotifEnabled": false,
   "tui": "fullscreen",
+  "autoMemoryEnabled": false,
+  "skipDangerousModePermissionPrompt": true,
+  "verbose": false,
+  "remoteControlAtStartup": false,
+  "inputNeededNotifEnabled": false,
+  "agentPushNotifEnabled": false,
+  "modelSettings": {
+    "claude-opus-5-5": {
+      "effortLevel": "high"
+    }
+  },
   "attribution": {
     "commit": "",
     "pr": ""
