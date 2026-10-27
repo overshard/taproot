@@ -79,12 +79,25 @@ instanceIdleTimeout=-1
 distributionInstallPath=D:\\WSL
 [wsl2]
 swapFile=D:\\WSL\\swap.vhdx
+memory=8GB
+swap=4GB
+guiApplications=false
 ```
 
 `instanceIdleTimeout=-1` is what the WSL Settings app calls "Keep WSL running",
 and without it the distro stops about 15 seconds after its last terminal closes
-and takes every container with it. The other two put new distros and the swap
-file on D: instead of C:.
+and takes every container with it. `distributionInstallPath` and `swapFile` put
+new distros and the swap file on D: instead of C:.
+
+`memory=8GB` caps the VM, which otherwise gets half the machine's RAM and is
+slow to hand its page cache back, so a game on the Windows side ran short while
+the sites sat idle. Nothing in here needs more, since the model lives in VRAM
+and `make check` builds one site at a time. Swap defaults to a quarter of
+`memory=`, which would be 2GB, so `swap=4GB` sets it by hand.
+`guiApplications=false` turns off WSLg, since nothing here runs a Linux GUI app
+and its compositor kept crashing and relaunching itself on Windows. `make wsl`
+only checks these are there and never writes the file. To undo any of them
+delete the line and run `wsl --shutdown`, and WSL goes back to its default.
 
 Everything docker has, images and volumes included, lives in `/var/lib/docker`
 inside the distro's single `ext4.vhdx`. To move all of it to another drive, from
