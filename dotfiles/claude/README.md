@@ -25,6 +25,10 @@ live file machine-local and update this template by hand when the posture change
 `.claude.json`, `settings.local.json` (per-machine permission grants), and anything with
 tokens, keys, or session/auth state.
 
+`cf-token` in there is a Cloudflare API token I handed Claude for the DNS cutover on
+2026-08-27. Nothing in taproot or orchard reads it, so it only comes back with a restore,
+and revoking it in the Cloudflare dashboard and deleting the file breaks nothing.
+
 ## Skills
 
 Plain skill dirs, each `skills/<name>/SKILL.md` with YAML frontmatter (`name`,
