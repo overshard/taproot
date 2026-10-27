@@ -158,8 +158,10 @@ make restic    # enter or repair the B2 credentials
 make restore   # pull the data back down
 ```
 
-The restore refuses to run when the code volume isn't empty, so a half finished
-attempt wants `make restore` and not `make install` again. In orchard, `make
+`make install` skips the restore when the code volume already has something in
+it, so a half finished attempt wants `make restore` and not `make install`
+again. `make restore` moves whatever is there into a `.before-restore-<UTC>/`
+inside each volume before it writes, so nothing is lost. In orchard, `make
 install` skips any site that already has a `.env`, which is right after a
 restore. And don't run `sh edge/setup-tunnel.sh down` in a hurry, it deletes the
 tunnel and leaves every CNAME pointing at nothing.
