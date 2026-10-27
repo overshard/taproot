@@ -27,8 +27,7 @@ C ?= webdev
 REGISTRY ?= overshard
 KEY ?= $(HOME)/.ssh/home_key
 
-VOLUMES = bythewood-code bythewood-claude bythewood-ssh bythewood-restic bythewood-models \
-	bythewood-llm
+VOLUMES = bythewood-code bythewood-claude bythewood-ssh bythewood-restic bythewood-llm
 
 NAME   = bythewood-$(C)
 IMAGE  = $(REGISTRY)/$(C):latest
