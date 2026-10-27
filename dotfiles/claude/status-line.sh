@@ -1,7 +1,7 @@
 #!/bin/bash
 # Claude Code status line. Requires bash, jq, git and date.
 #
-#   usg ▓▓▓▓▓░░░░░ 52% · resets 2h 14m | ctx ▓▓░░░░░░░░ 18% | ~/code/finance  main | 3:45 PM ET
+#   usg ▓▓▓▓▓░░░░░ 52% · resets 2h 14m | ctx ▓▓░░░░░░░░ 18% | ~/code/orchard  main | 3:45 PM ET
 #
 # Reads the status-line JSON on stdin. Every optional field uses `// empty`, so
 # missing data degrades instead of erroring: context_window only appears once a
