@@ -124,8 +124,21 @@ The long tail can wait, since no site needs it to serve:
 
 ```sh
 cd ~/code/orchard && make wiki     # 12.5GB, chat's offline Wikipedia
-cd ~/code/taproot && make models   # the weights for aiagent
 ```
+
+aiagent's gateway key lived in the `bythewood-llm` volume, so it's gone like
+the others. Without one aiagent tries to serve the model itself, which needs
+weights it doesn't have yet and would push the gateway's copy off the card
+anyway. Mint a new one and store it before creating the container:
+
+```sh
+cd ~/code/orchard && make llm-key NAME=aiagent   # prints the key once
+cd ~/code/taproot && make llm-key                # paste it when asked
+make up C=aiagent
+```
+
+`make models` is only for a machine with no gateway, like the laptop, where
+aiagent serves the model itself and needs the weights first.
 
 ## On a machine that already has Docker
 
