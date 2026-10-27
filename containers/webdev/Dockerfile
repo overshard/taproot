@@ -87,8 +87,8 @@ RUN curl -fsSL -o /tmp/typst.tar.xz \
 
 # Debian does not package gh, and GitHub's apt repo would be a second keyring
 # for one binary.
-ARG GH_VERSION=2.98.0
-ARG GH_SHA256=3b8ac6b30336802fc1a858d7c084e11cdf24ac1a761ca90b68022d7d729208de
+ARG GH_VERSION=2.103.3
+ARG GH_SHA256=4c806978ffce1cec70853302a56d70ac6da4f19bae7adca4e1a8ab00633dd91d
 RUN curl -fsSL -o /tmp/gh.tar.gz \
       "https://github.com/cli/cli/releases/download/v${GH_VERSION}/gh_${GH_VERSION}_linux_amd64.tar.gz" && \
     echo "${GH_SHA256}  /tmp/gh.tar.gz" | sha256sum -c - && \
