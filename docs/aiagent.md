@@ -1,12 +1,16 @@
 # The aiagent container
 
-Qwen3.5-9B at 128k context on a llama.cpp CUDA server, plus the
-[pi](https://pi.dev) coding agent pointed at it. Sized for an 8GB Ampere card.
-The server binds loopback and publishes nothing, so only pi inside the container
-can reach it and it needs no API key.
+Ornith 1.5 9B at Q4_K_M plus the [pi](https://pi.dev) coding agent, sized for
+an 8GB Ampere card. On the desktop pi uses the model gateway at
+`llm.bythewood.me` with a 64k window and nothing loads in here, since one card
+can't hold the gateway's copy and a second one. With no key stored, or the
+gateway not answering, it serves the same model itself at 128k context on a
+llama.cpp CUDA server instead. That server binds loopback and publishes nothing,
+so only pi inside the container can reach it and it needs no API key.
 
 ```sh
-make models             # once, the only step that reaches Hugging Face
+make llm-key            # once, the key from: cd ~/code/orchard && make llm-key NAME=aiagent
+make models             # only without a gateway, the one step that reaches Hugging Face
 make up C=aiagent
 make shell C=aiagent    # then type: pi
 make stop C=aiagent     # frees the VRAM
