@@ -3,7 +3,7 @@
 # restic-check.sh
 #
 # Read back a random 5% of the repository and check its structure. Run weekly
-# by the host's restic-check.timer, or by hand with make check-backup. A full
+# by the host's restic-check.timer, or by hand with make verify. A full
 # read of every pack would download the whole repo from B2 each time.
 #
 
