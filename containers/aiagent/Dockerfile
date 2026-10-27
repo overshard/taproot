@@ -36,7 +36,7 @@
 # tolerates a 4 bit cache worst.
 
 
-FROM debian:trixie-slim@sha256:a99cfc517144bc59b1978475ec53b46ecabec7e43635402ee5b77cc54cd1b20a AS build
+FROM debian:trixie-slim@sha256:62bd423aeee912639ca8ee681c2b762cb3e25137e0a92b20be455898a9f034ad AS build
 
 # CUDA 13.2 produces gibberish from low-bit quants.
 ARG CUDA=13-3
@@ -74,7 +74,7 @@ RUN git clone --depth 1 --branch ${LLAMA_REF} https://github.com/ggml-org/llama.
     strip /tmp/build/bin/llama-server /tmp/build/bin/llama-bench
 
 
-FROM debian:trixie-slim@sha256:a99cfc517144bc59b1978475ec53b46ecabec7e43635402ee5b77cc54cd1b20a
+FROM debian:trixie-slim@sha256:62bd423aeee912639ca8ee681c2b762cb3e25137e0a92b20be455898a9f034ad
 
 ARG CUDA=13-3
 
