@@ -3,8 +3,8 @@
 # code-sync.sh
 #
 # Two passes over ~/code/. First, pull from origin for every git repo already
-# there, skipping any that is dirty or on a detached HEAD, and using --ff-only
-# so a divergent branch never gets a silent merge or rebase.
+# there, skipping any that is dirty, on a detached HEAD, or without an upstream,
+# and using --ff-only so a divergent branch never gets a silent merge or rebase.
 #
 # Second, ask the public GitHub API for $GITHUB_USER's repos and clone any
 # non-archived, non-fork, owned one that is not here yet. The API call needs no
@@ -42,6 +42,12 @@ for path in "$CODE"/*/; do
 
     if ! git symbolic-ref --quiet HEAD >/dev/null; then
         printf "  [skip] %s (detached HEAD)\n" "$name"
+        skip=$((skip + 1))
+        continue
+    fi
+
+    if ! git rev-parse --abbrev-ref '@{u}' >/dev/null 2>&1; then
+        printf "  [skip] %s (no upstream)\n" "$name"
         skip=$((skip + 1))
         continue
     fi
