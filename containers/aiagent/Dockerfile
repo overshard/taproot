@@ -87,10 +87,11 @@ ENV DEBIAN_FRONTEND=noninteractive \
     LLAMA_CACHE=/models \
     PATH=/home/ai/scripts:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 
-# Node, not bun, because pi's extension installer shells out to `npm root -g`.
-# The Docker CLI is the client only and reaches webdev, where the build tools
-# are. From Docker's own repo, not Debian's.
+# Node, not bun, since pi's installer shells out to `npm root -g`. The Docker
+# CLI is client only and reaches webdev's build tools. The upgrade brings in
+# Debian's security fixes, since the base above is pinned by digest.
 RUN apt-get update && \
+    apt-get upgrade -y && \
     apt-get install -y --no-install-recommends \
         ca-certificates curl git openssh-client jq tmux less nano procps sudo \
         ripgrep fd-find iptables libgomp1 libcurl4 && \
