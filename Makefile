@@ -196,7 +196,8 @@ wsl:
 	@echo ""
 	@conf="$$(wslpath "$$(cmd.exe /c 'echo %USERPROFILE%' 2>/dev/null | tr -d '\r')")/.wslconfig"; \
 	echo "  $$conf"; \
-	for kv in general:instanceIdleTimeout=-1 general:distributionInstallPath='D:\\WSL' wsl2:swapFile='D:\\WSL\\swap.vhdx'; do \
+	for kv in general:instanceIdleTimeout=-1 general:distributionInstallPath='D:\\WSL' wsl2:swapFile='D:\\WSL\\swap.vhdx' \
+		wsl2:memory=8GB wsl2:swap=4GB wsl2:guiApplications=false; do \
 		key=$$(echo "$$kv" | sed 's/^[a-z2]*://;s/=.*//'); \
 		if grep -qs "^$$key[[:space:]]*=" "$$conf"; then \
 			printf '    %-24s %s\n' "$$key" "set"; \
@@ -207,6 +208,9 @@ wsl:
 	echo "    instanceIdleTimeout=-1 is what the WSL Settings app calls"; \
 	echo "    \"Keep WSL running\". without it the distro stops 15s after its"; \
 	echo "    last terminal closes and takes every container with it."; \
+	echo "    memory=8GB caps the VM, which otherwise takes half the RAM, and"; \
+	echo "    swap defaults to a quarter of memory so it is set by hand."; \
+	echo "    deleting a line puts that one back to WSL's default."; \
 	echo "    a .wslconfig change needs: wsl --shutdown"
 	@echo ""
 	@if sudo grep -rqs NOPASSWD /etc/sudoers.d/ 2>/dev/null; then \
