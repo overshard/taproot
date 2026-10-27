@@ -37,8 +37,7 @@ Plain skill dirs, each `skills/<name>/SKILL.md` with YAML frontmatter (`name`,
 - **journal** wrap the session into the `~/code/memory` vault (the memory contract).
 - **playwright** browser automation via `playwright-cli` (token-efficient, replaces the
   Playwright MCP).
-- **rust** working on the axum + Vite + SQLite projects (replaces rust-analyzer-lsp, note
-  this drops live LSP diagnostics, a skill is instructions only).
+- **roundup** a news and markets catch up, diffed against the last one saved in the vault.
 
 ## Setup on a fresh machine
 
