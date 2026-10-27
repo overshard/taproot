@@ -304,15 +304,11 @@ update: require-container
 		$(DOCKER) rm --force bythewood-swap >/dev/null 2>&1 || true; \
 		$(DOCKER) run --rm --detach --name bythewood-swap \
 			--volume /var/run/docker.sock:/var/run/docker.sock docker:cli \
-			sh -c "sleep 2; docker rm --force $(NAME); docker run $(RUN_ARGS) $(IMAGE)" >/dev/null; \
+			sh -c "sleep 2; docker rm --force $(NAME); docker run $(RUN_ARGS) $(IMAGE)$(if $(filter webdev,$(C)), && docker exec $(NAME) sh -c '$(LINKS)')" >/dev/null; \
 	else \
 		$(DOCKER) rm --force $(NAME) >/dev/null 2>&1 || true; \
 		$(DOCKER) run $(RUN_ARGS) $(IMAGE); \
-		if [ "$(C)" = webdev ]; then \
-			$(DOCKER) exec bythewood-webdev sh -c \
-				"ln -snf /home/dev/code/taproot/dotfiles/claude/skills /home/dev/.claude/skills && \
-				 ln -snf /home/dev/code/taproot/dotfiles/claude/status-line.sh /home/dev/.claude/status-line.sh"; \
-		fi; \
+		if [ "$(C)" = webdev ]; then $(DOCKER) exec bythewood-webdev sh -c "$(LINKS)"; fi; \
 		echo ""; \
 		echo "$(NAME) replaced. check it with: make doctor"; \
 	fi
@@ -432,11 +428,13 @@ sync: require-webdev
 
 # /home/dev/.claude is a volume and shadows whatever the image puts there, so
 # these have to be linked into the running container. Safe to re-run.
+# ~/.config/nvim isn't a volume, so a replaced container needs its link again.
+LINKS = ln -snf /home/dev/code/taproot/dotfiles/claude/skills /home/dev/.claude/skills && \
+	ln -snf /home/dev/code/taproot/dotfiles/claude/status-line.sh /home/dev/.claude/status-line.sh && \
+	ln -snf /home/dev/code/taproot/dotfiles/neovim/init.lua /home/dev/.config/nvim/init.lua
+
 dotfiles:
-	$(DOCKER) exec bythewood-webdev sh -c \
-		"ln -snf /home/dev/code/taproot/dotfiles/claude/skills /home/dev/.claude/skills && \
-		 ln -snf /home/dev/code/taproot/dotfiles/claude/status-line.sh /home/dev/.claude/status-line.sh && \
-		 ln -snf /home/dev/code/taproot/dotfiles/neovim/init.lua /home/dev/.config/nvim/init.lua"
+	$(DOCKER) exec bythewood-webdev sh -c "$(LINKS)"
 	echo "claude skills, status line and neovim config linked"
 
 # The only step that reaches Hugging Face, weights land in the volume.
