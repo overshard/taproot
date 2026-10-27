@@ -22,7 +22,7 @@ in taproot fixes it.
 ## Core workflow
 
 ```bash
-playwright-cli open http://localhost:8000/login   # add --headed to watch it visually
+playwright-cli open http://localhost:8000/login
 playwright-cli snapshot                            # accessibility tree + element refs
 playwright-cli click <ref>                         # refs come from the latest snapshot
 playwright-cli type "hello"
