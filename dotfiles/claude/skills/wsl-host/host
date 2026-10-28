@@ -1,0 +1,11 @@
+#!/usr/bin/env bash
+# Run a command as root in the WSL distro itself, outside every container, by
+# entering PID 1's namespaces from a privileged orchard-util container.
+#
+#   host <command> [args...]
+#   host sh -s < script.sh
+set -euo pipefail
+
+[ $# -gt 0 ] || { echo "usage: host <command> [args...]" >&2; exit 1; }
+exec sudo docker run --rm -i --privileged --pid host --network host orchard-util \
+	nsenter -t 1 -a -- "$@"
