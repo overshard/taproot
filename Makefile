@@ -173,8 +173,16 @@ wsl:
 		sudo tee /etc/systemd/system/restic-check.timer >/dev/null
 	printf '[Unit]\nDescription=phone alert for a failed %%i\n\n[Service]\nType=oneshot\nExecStart=/usr/bin/docker exec bythewood-webdev restic-alert %%i\n' | \
 		sudo tee /etc/systemd/system/restic-alert@.service >/dev/null
+# NVIDIA's CDI refresh only fires on Linux kernel module changes, and a driver
+# update from Windows changes none, so a timer runs it and then restarts any llm
+# container its health check found without a driver. Undo: see docs/wsl.md.
+	printf '[Unit]\nDescription=regenerate the CDI spec after a Windows driver update\n\n[Timer]\nOnBootSec=3min\nOnUnitActiveSec=10min\nUnit=nvidia-cdi-refresh.service\n\n[Install]\nWantedBy=timers.target\n' | \
+		sudo tee /etc/systemd/system/nvidia-cdi-refresh-wsl.timer >/dev/null
+	sudo mkdir -p /etc/systemd/system/nvidia-cdi-refresh.service.d
+	printf '[Service]\nExecStartPost=-/bin/sh -c "docker ps -q --filter name=orchard-llm --filter health=unhealthy | xargs -r docker restart"\n' | \
+		sudo tee /etc/systemd/system/nvidia-cdi-refresh.service.d/restart-llm.conf >/dev/null
 	sudo systemctl daemon-reload
-	sudo systemctl enable --now restic-backup.timer restic-check.timer
+	sudo systemctl enable --now restic-backup.timer restic-check.timer nvidia-cdi-refresh-wsl.timer
 # Something has to start the distro, since WSL has no autostart setting of its
 # own. A boot task covers power on and a Startup file covers sign-in, so write
 # the file only when no boot task is there to do the job.
