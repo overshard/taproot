@@ -35,6 +35,26 @@ group, and writes a hidden starter into the Windows Startup folder. It ends by
 running `nvidia-smi` in a container, so a table with the card in it means the GPU
 works. Install the NVIDIA driver on Windows only, never inside the distro.
 
+The container toolkit hands the card to a container through a CDI spec at
+`/var/run/cdi/nvidia.yaml`, which names the Windows driver store by its folder
+under `/usr/lib/wsl/drivers`. A driver update from Windows gives the store a new
+folder, and NVIDIA's own `nvidia-cdi-refresh.path` only watches Linux kernel
+modules, so the spec goes stale and any container started after that runs on the
+CPU. `make wsl` adds two files for it. `nvidia-cdi-refresh-wsl.timer` runs
+NVIDIA's `nvidia-cdi-refresh.service` three minutes after boot and every ten
+minutes after, and a drop-in at
+`/etc/systemd/system/nvidia-cdi-refresh.service.d/restart-llm.conf` has that
+service restart any `orchard-llm` container docker marks unhealthy, since llm's
+health check fails when its driver link is broken and docker reads the spec again
+on every start. By hand it's `sudo systemctl start nvidia-cdi-refresh.service`,
+and `systemctl list-timers` shows when it runs next. To undo:
+
+```sh
+sudo systemctl disable --now nvidia-cdi-refresh-wsl.timer
+sudo rm /etc/systemd/system/nvidia-cdi-refresh-wsl.timer /etc/systemd/system/nvidia-cdi-refresh.service.d/restart-llm.conf
+sudo systemctl daemon-reload
+```
+
 dockerd needs systemd as PID 1. New Debian installs already have it, and if this
 one doesn't then `make wsl` writes `[boot] systemd=true` into `/etc/wsl.conf` and
 stops, because that needs a `wsl --shutdown` from PowerShell before it takes.
