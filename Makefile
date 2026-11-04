@@ -290,9 +290,22 @@ up: require-container
 	@echo ""
 	$(MAKE) --no-print-directory doctor
 
-# Replacing webdev from inside webdev cannot be done directly: `docker rm
-# --force` on your own container kills the make doing the removing, so the
-# `docker run` after it never happens. A throwaway docker:cli survives that.
+# The swap stops the old container rather than removing it, since webdev's
+# published port means both can't run at once, and a new one that fails to
+# start leaves the old one to rename back and start again.
+SWAP = $(1) rm --force $(NAME)-old >/dev/null 2>&1; \
+	$(1) rename $(NAME) $(NAME)-old && $(1) stop $(NAME)-old >/dev/null && \
+	if $(1) run $(RUN_ARGS) $(IMAGE) >/dev/null; then \
+		$(1) rm $(NAME)-old >/dev/null$(if $(filter webdev,$(C)), && $(1) exec $(NAME) sh -c '$(LINKS)'); \
+	else \
+		$(1) rm --force $(NAME) >/dev/null 2>&1; \
+		$(1) rename $(NAME)-old $(NAME) && $(1) start $(NAME) >/dev/null; \
+		false; \
+	fi
+
+# Replacing webdev from inside webdev cannot be done directly, since stopping
+# your own container kills the make doing it. So a throwaway container off the
+# webdev image, running as root for the socket, does the swap from outside.
 #
 # Nothing below may contain $$(MAKE). GNU make runs any recipe line carrying
 # that string even under `-n`, so a dry run would really replace the container.
@@ -302,21 +315,22 @@ update: require-container
 	$(DOCKER) build --no-cache --tag $(IMAGE) -f containers/$(C)/Dockerfile .
 	@self=$$(cat /etc/hostname 2>/dev/null); \
 	target=$$($(DOCKER) inspect --format '{{.Config.Hostname}}' $(NAME) 2>/dev/null); \
-	if [ -n "$$target" ] && [ "$$self" = "$$target" ]; then \
+	if [ -z "$$target" ]; then \
+		$(DOCKER) run $(RUN_ARGS) $(IMAGE)$(if $(filter webdev,$(C)), && $(DOCKER) exec $(NAME) sh -c "$(LINKS)"); \
+		echo "$(NAME) created. check it with: make doctor"; \
+	elif [ "$$self" = "$$target" ]; then \
 		echo ""; \
 		echo "replacing the container you are sitting in."; \
-		echo "this shell will drop in about two seconds. to get back in:"; \
+		echo "this shell will drop in a few seconds. to get back in:"; \
 		echo ""; \
 		echo "    make shell C=$(C)"; \
 		echo ""; \
 		$(DOCKER) rm --force bythewood-swap >/dev/null 2>&1 || true; \
-		$(DOCKER) run --rm --detach --name bythewood-swap \
-			--volume /var/run/docker.sock:/var/run/docker.sock docker:cli \
-			sh -c "sleep 2; docker rm --force $(NAME); docker run $(RUN_ARGS) $(IMAGE)$(if $(filter webdev,$(C)), && docker exec $(NAME) sh -c '$(LINKS)')" >/dev/null; \
+		$(DOCKER) run --rm --detach --name bythewood-swap --user 0 --entrypoint sh \
+			--volume /var/run/docker.sock:/var/run/docker.sock $(REGISTRY)/webdev:latest \
+			-c "sleep 2; $(call SWAP,docker)" >/dev/null; \
 	else \
-		$(DOCKER) rm --force $(NAME) >/dev/null 2>&1 || true; \
-		$(DOCKER) run $(RUN_ARGS) $(IMAGE); \
-		if [ "$(C)" = webdev ]; then $(DOCKER) exec bythewood-webdev sh -c "$(LINKS)"; fi; \
+		$(call SWAP,$(DOCKER)) || { echo "$(NAME) was not replaced, see the error above" >&2; exit 1; }; \
 		echo ""; \
 		echo "$(NAME) replaced. check it with: make doctor"; \
 	fi
