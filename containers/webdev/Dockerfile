@@ -189,6 +189,8 @@ COPY dotfiles/bash_aliases /home/dev/.bash_aliases
 COPY dotfiles/gitconfig /home/dev/.gitconfig
 COPY dotfiles/neovim/init.lua /home/dev/.config/nvim/init.lua
 COPY dotfiles/tmux.conf /home/dev/.tmux.conf
+# The template ornith-ai's own GGUF carries, see scripts/pi.sh.
+COPY containers/webdev/ornith.jinja /usr/local/share/ornith/chat-template.jinja
 COPY containers/webdev/scripts/ /home/dev/scripts/
 
 # The file tree sidebar, as a native package so there is no plugin manager and
@@ -249,7 +251,7 @@ RUN mkdir -p /home/dev/.pi/agent/bin && \
         > /home/dev/.pi/agent/settings.json && \
     BUN_INSTALL_CACHE_DIR=/tmp/bun-cache /usr/local/bin/pi install npm:pi-web-access@${PI_WEB_ACCESS_VERSION} && \
     rm -rf /tmp/bun-cache && \
-    printf '%s' '{"providers":{"local":{"baseUrl":"http://127.0.0.1:8080/v1","api":"openai-completions","apiKey":"none","compat":{"supportsDeveloperRole":false,"supportsReasoningEffort":false,"thinkingFormat":"qwen-chat-template"},"models":[{"id":"local","name":"Ornith 1.5 9B","reasoning":true,"contextWindow":65536,"maxTokens":8192,"input":["text"],"cost":{"input":0,"output":0,"cacheRead":0,"cacheWrite":0}}]}}}' \
+    printf '%s' '{"providers":{"local":{"baseUrl":"http://127.0.0.1:8080/v1","api":"openai-completions","apiKey":"none","compat":{"supportsDeveloperRole":false,"supportsReasoningEffort":false,"thinkingFormat":"qwen-chat-template"},"models":[{"id":"local","name":"Ornith 1.5 9B uncensored","reasoning":true,"contextWindow":65536,"maxTokens":8192,"input":["text"],"cost":{"input":0,"output":0,"cacheRead":0,"cacheWrite":0}}]}}}' \
         > /home/dev/.pi/agent/models.json && \
     printf '%s' '{"searchProvider":"duckduckgo","workflow":"none","autoOpenBrowser":false}' \
         > /home/dev/.pi/web-search.json

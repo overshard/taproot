@@ -1,8 +1,9 @@
 # pi in webdev
 
-webdev carries the [pi](https://pi.dev) coding agent and Ornith 1.5 9B at
-Q4_K_M on a llama.cpp CUDA server, sized for an 8GB Ampere card. Nothing goes
-to the llm gateway in orchard, the model runs right here.
+webdev carries the [pi](https://pi.dev) coding agent and an abliterated Ornith
+1.5 9B (junafinity's, in mradermacher's Q4_K_M) on a llama.cpp CUDA server,
+sized for an 8GB Ampere card. Nothing goes to the llm gateway in orchard, the
+model runs right here.
 
 ```sh
 make models     # once, about 5.4GB from Hugging Face into bythewood-models

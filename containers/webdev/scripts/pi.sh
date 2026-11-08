@@ -14,7 +14,10 @@
 set -eu
 
 PI=/usr/local/bin/pi
-MODEL=/models/ornith/Ornith-1.5-9B-Q4_K_M.gguf
+MODEL=/models/ornith/Ornith-1.5-9B-uncensored.Q4_K_M.gguf
+# The abliterated GGUF ships the plain upstream template, which raises on a
+# system message anywhere but first, so the stock one rides beside it.
+TEMPLATE=/usr/local/share/ornith/chat-template.jinja
 PORT=8080
 LOG="$HOME/.cache/ornith.log"
 LOCK=/tmp/ornith.lock
@@ -54,6 +57,7 @@ start() {
 		--parallel 1 \
 		--batch-size 2048 --ubatch-size 256 \
 		--jinja \
+		--chat-template-file "$TEMPLATE" \
 		--reasoning off \
 		--temp 0.7 --top-p 0.8 --top-k 20 \
 		--sleep-idle-seconds 180 \
