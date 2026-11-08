@@ -11,9 +11,6 @@
 # the three things no image can carry: the git key, the backup credentials, and
 # the data itself. `make help` lists everything else.
 #
-# Add C=aiagent to any target, it defaults to webdev, which is the one you live
-# in.
-#
 # Run from a clone of this repo, which is the build context.
 #
 # The docker socket is root-owned, so every command goes through sudo unless
@@ -23,33 +20,31 @@
 SUDO   ?= $(if $(filter 0,$(shell id -u)),,sudo)
 DOCKER ?= $(SUDO) docker
 
-C ?= webdev
 REGISTRY ?= overshard
 KEY ?= $(HOME)/.ssh/home_key
 
-VOLUMES = bythewood-code bythewood-claude bythewood-ssh bythewood-restic bythewood-llm
+VOLUMES = bythewood-code bythewood-claude bythewood-ssh bythewood-restic bythewood-models
 
-NAME   = bythewood-$(C)
-IMAGE  = $(REGISTRY)/$(C):latest
-WEBDEV = bythewood-webdev
+NAME  = bythewood-webdev
+IMAGE = $(REGISTRY)/webdev:latest
 
-RUN_webdev = --detach --name bythewood-webdev --hostname bythewood-webdev --init \
-	--restart unless-stopped \
+# The card goes in only where docker has the nvidia runtime, since --gpus on a
+# machine without one fails the whole run and webdev with it. pi needs it and
+# nothing else does.
+GPUS = $(shell $(DOCKER) info --format '{{range $$k, $$v := .Runtimes}}{{$$k}} {{end}}' 2>/dev/null | grep -qw nvidia && echo --gpus all)
+
+RUN_ARGS = --detach --name $(NAME) --hostname $(NAME) --init \
+	--restart unless-stopped $(GPUS) \
 	--publish 8000:8000 \
 	--volume bythewood-code:/home/dev/code \
 	--volume bythewood-claude:/home/dev/.claude \
 	--volume bythewood-ssh:/home/dev/.ssh \
 	--volume bythewood-restic:/home/dev/.restic \
-	--volume /var/run/docker.sock:/var/run/docker.sock
-
-RUN_aiagent = --detach --name bythewood-aiagent --init --gpus all \
-	--volume bythewood-code:/home/ai/code \
-	--volume bythewood-ssh:/home/ai/.ssh \
 	--volume bythewood-models:/models \
-	--volume bythewood-llm:/home/ai/.llm \
 	--volume /var/run/docker.sock:/var/run/docker.sock
 
-RUN_ARGS = $(RUN_$(C))
+ORNITH_URL = https://huggingface.co/ornith-ai/Ornith-1.5-9B-GGUF/resolve/main/Ornith-1.5-9B-Q4_K_M.gguf
+ORNITH_SHA256 = 70c112196e0b7023803c9762752e46d29e612a92c83f995bc3ba1ceb07e8fab6
 
 .DEFAULT_GOAL := help
 
@@ -57,8 +52,7 @@ RUN_ARGS = $(RUN_$(C))
 .NOTPARALLEL:
 
 .PHONY: help wsl install up update doctor shell build stop key restic password \
-	backup verify snapshots restore sync dotfiles models serve llm-key \
-	require-container require-webdev
+	backup verify snapshots restore sync dotfiles models require-webdev
 
 help:
 	@echo "make wsl            turn a fresh Debian WSL distro into the docker host"
@@ -81,11 +75,7 @@ help:
 	@echo "make restore        pull everything back from the latest snapshot"
 	@echo "make sync           pull every repo under ~/code, clone any new ones"
 	@echo ""
-	@echo "make models         fetch the model weights once; needs the network"
-	@echo "make serve MODEL=   run a different model without rebuilding"
-	@echo "make llm-key KEY=    store the model gateway key aiagent uses"
-	@echo ""
-	@echo "add C=aiagent to any of the first block. it defaults to webdev."
+	@echo "make models         fetch Ornith's weights for pi, once, about 5.4GB"
 
 # Turns a fresh Debian WSL distro into the docker host, run from inside it.
 # dockerd needs systemd as PID 1, which new Debian installs already have, and
@@ -261,10 +251,10 @@ install: up restic
 	@if [ -s "$(KEY)" ]; then $(MAKE) --no-print-directory key; \
 	else echo "no key at $(KEY), the restore will bring it back"; fi
 	@echo ""
-	@if $(DOCKER) exec $(WEBDEV) sh -c 'test -z "$$(ls -A /home/dev/code)"' 2>/dev/null; then \
+	@if $(DOCKER) exec $(NAME) sh -c 'test -z "$$(ls -A /home/dev/code)"' 2>/dev/null; then \
 		echo "code/ is empty, restoring the latest snapshot"; \
 		echo ""; \
-		$(DOCKER) exec -it $(WEBDEV) restic-restore; \
+		$(DOCKER) exec -it $(NAME) restic-restore; \
 	else \
 		echo "code/ already has something in it, so the restore is skipped."; \
 		echo "to pull the snapshot down anyway: make restore"; \
@@ -276,17 +266,17 @@ install: up restic
 
 # Idempotent, so it repairs as readily as it installs. It never replaces a
 # running container, that is what `update` is for.
-up: require-container
+up:
 	for v in $(VOLUMES); do $(DOCKER) volume create $$v >/dev/null; done
 	$(DOCKER) image inspect $(IMAGE) >/dev/null 2>&1 || \
-		$(DOCKER) build --pull --tag $(IMAGE) -f containers/$(C)/Dockerfile .
+		$(DOCKER) build --pull --tag $(IMAGE) -f containers/webdev/Dockerfile .
 	state=$$($(DOCKER) inspect --format '{{.State.Status}}' $(NAME) 2>/dev/null); \
 	case "$$state" in \
 	running) echo "$(NAME) is already running" ;; \
 	"")      echo "creating $(NAME)"; $(DOCKER) run $(RUN_ARGS) $(IMAGE) ;; \
 	*)       echo "starting $(NAME) (was $$state)"; $(DOCKER) start $(NAME) ;; \
 	esac
-	test "$(C)" != "webdev" || $(MAKE) --no-print-directory dotfiles
+	$(MAKE) --no-print-directory dotfiles
 	@echo ""
 	$(MAKE) --no-print-directory doctor
 
@@ -296,7 +286,7 @@ up: require-container
 SWAP = $(1) rm --force $(NAME)-old >/dev/null 2>&1; \
 	$(1) rename $(NAME) $(NAME)-old && $(1) stop $(NAME)-old >/dev/null && \
 	if $(1) run $(RUN_ARGS) $(IMAGE) >/dev/null; then \
-		$(1) rm $(NAME)-old >/dev/null$(if $(filter webdev,$(C)), && $(1) exec $(NAME) sh -c '$(LINKS)'); \
+		$(1) rm $(NAME)-old >/dev/null && $(1) exec $(NAME) sh -c '$(LINKS)'; \
 	else \
 		$(1) rm --force $(NAME) >/dev/null 2>&1; \
 		$(1) rename $(NAME)-old $(NAME) && $(1) start $(NAME) >/dev/null; \
@@ -309,21 +299,23 @@ SWAP = $(1) rm --force $(NAME)-old >/dev/null 2>&1; \
 #
 # Nothing below may contain $$(MAKE). GNU make runs any recipe line carrying
 # that string even under `-n`, so a dry run would really replace the container.
-# --no-cache because the base is pinned by digest, so without it the apt layer
-# is reused and Debian's security fixes never arrive.
-update: require-container
-	$(DOCKER) build --no-cache --tag $(IMAGE) -f containers/$(C)/Dockerfile .
+# No cache for the webdev stage because the base is pinned by digest, so without
+# it the apt layer is reused and Debian's security fixes never arrive. The llama
+# stage keeps its cache, it's a 15 minute CUDA build that only changes with
+# LLAMA_REF.
+update:
+	$(DOCKER) build --no-cache-filter webdev --tag $(IMAGE) -f containers/webdev/Dockerfile .
 	@self=$$(cat /etc/hostname 2>/dev/null); \
 	target=$$($(DOCKER) inspect --format '{{.Config.Hostname}}' $(NAME) 2>/dev/null); \
 	if [ -z "$$target" ]; then \
-		$(DOCKER) run $(RUN_ARGS) $(IMAGE)$(if $(filter webdev,$(C)), && $(DOCKER) exec $(NAME) sh -c "$(LINKS)"); \
+		$(DOCKER) run $(RUN_ARGS) $(IMAGE) && $(DOCKER) exec $(NAME) sh -c "$(LINKS)"; \
 		echo "$(NAME) created. check it with: make doctor"; \
 	elif [ "$$self" = "$$target" ]; then \
 		echo ""; \
 		echo "replacing the container you are sitting in."; \
 		echo "this shell will drop in a few seconds. to get back in:"; \
 		echo ""; \
-		echo "    make shell C=$(C)"; \
+		echo "    make shell"; \
 		echo ""; \
 		$(DOCKER) rm --force bythewood-swap >/dev/null 2>&1 || true; \
 		$(DOCKER) run --rm --detach --name bythewood-swap --user 0 --entrypoint sh \
@@ -342,18 +334,17 @@ doctor:
 		st=$$($(DOCKER) inspect --format '{{.State.Status}}' "bythewood-$$1" 2>/dev/null); \
 		img=$$($(DOCKER) image inspect $(REGISTRY)/$$1:latest >/dev/null 2>&1 && echo yes || echo no); \
 		if [ "$$img" = no ]; then \
-			printf '  %-10s %-14s %s\n' "$$1" "no image" "-> make up C=$$1"; \
+			printf '  %-10s %-14s %s\n' "$$1" "no image" "-> make up"; \
 		elif [ -z "$$st" ]; then \
-			printf '  %-10s %-14s %s\n' "$$1" "not created" "-> make up C=$$1"; \
+			printf '  %-10s %-14s %s\n' "$$1" "not created" "-> make up"; \
 		elif [ "$$st" != running ]; then \
-			printf '  %-10s %-14s %s\n' "$$1" "$$st" "-> make up C=$$1"; \
+			printf '  %-10s %-14s %s\n' "$$1" "$$st" "-> make up"; \
 		else \
 			printf '  %-10s %-14s\n' "$$1" "running"; \
 		fi; \
 	}; \
 	echo "containers"; \
 	probe webdev; \
-	probe aiagent; \
 	echo ""; \
 	echo "volumes"; \
 	sizes=$$($(DOCKER) system df -v 2>/dev/null | awk '/^VOLUME NAME/{v=1;next} v && NF==3{print $$1"="$$3}'); \
@@ -365,40 +356,49 @@ doctor:
 	done; \
 	echo ""; \
 	echo "webdev setup"; \
-	if $(DOCKER) exec $(WEBDEV) test -s /home/dev/.ssh/home_key 2>/dev/null; then \
+	if $(DOCKER) exec $(NAME) test -s /home/dev/.ssh/home_key 2>/dev/null; then \
 		echo "  git ssh key     ok"; \
 	else \
 		echo "  git ssh key     MISSING  -> make key"; \
 	fi; \
-	$(DOCKER) exec $(WEBDEV) restic-setup --check >/dev/null 2>&1; \
+	$(DOCKER) exec $(NAME) restic-setup --check >/dev/null 2>&1; \
 	case $$? in \
 	0)   echo "  restic          ok" ;; \
 	127) echo "  restic          unknown  -> image predates restic-setup, run: make update" ;; \
 	*)   echo "  restic          NOT SET UP  -> make restic" ;; \
 	esac; \
-	if age=$$($(DOCKER) exec $(WEBDEV) restic-status --age 2>/dev/null); then \
+	if age=$$($(DOCKER) exec $(NAME) restic-status --age 2>/dev/null); then \
 		echo "  last backup     $$age"; \
 	else \
 		echo "  last backup     $${age:-unknown}, over 2 days  -> make backup, then: journalctl -u restic-backup"; \
 	fi; \
-	if $(DOCKER) exec $(WEBDEV) test -L /home/dev/.claude/skills 2>/dev/null; then \
+	if $(DOCKER) exec $(NAME) test -L /home/dev/.claude/skills 2>/dev/null; then \
 		echo "  claude dotfiles ok"; \
 	else \
 		echo "  claude dotfiles MISSING  -> make dotfiles"; \
+	fi; \
+	if $(DOCKER) exec $(NAME) test -s /models/ornith/Ornith-1.5-9B-Q4_K_M.gguf 2>/dev/null; then \
+		echo "  pi weights      ok"; \
+	else \
+		echo "  pi weights      MISSING  -> make models"; \
+	fi; \
+	if $(DOCKER) exec $(NAME) nvidia-smi -L >/dev/null 2>&1; then \
+		echo "  pi gpu          ok"; \
+	else \
+		echo "  pi gpu          not visible  -> make update, unless this machine has no NVIDIA card"; \
 	fi
 
-shell: require-container
+shell:
 	$(DOCKER) exec -it $(NAME) tmux
 
-build: require-container
-	$(DOCKER) build --pull --tag $(IMAGE) -f containers/$(C)/Dockerfile .
+build:
+	$(DOCKER) build --pull --tag $(IMAGE) -f containers/webdev/Dockerfile .
 
-stop: require-container
+stop:
 	$(DOCKER) stop $(NAME)
 
 # The git identity is the one thing that neither the image nor a restore can
-# carry, since restic will not have run yet on a fresh machine. Both containers
-# mount bythewood-ssh, so copying it once serves them both.
+# carry, since restic will not have run yet on a fresh machine.
 #
 # The chown is explicit because docker cp lands the file as root, and the 600
 # because ssh refuses anything looser and a key copied off Windows arrives with
@@ -406,7 +406,7 @@ stop: require-container
 key: require-webdev
 	@src="$(KEY)"; \
 	if [ ! -s "$$src" ]; then \
-		if $(DOCKER) exec $(WEBDEV) test -s /home/dev/.ssh/home_key 2>/dev/null; then \
+		if $(DOCKER) exec $(NAME) test -s /home/dev/.ssh/home_key 2>/dev/null; then \
 			echo "the git key is already in the volume, nothing to copy"; \
 			exit 0; \
 		fi; \
@@ -415,8 +415,8 @@ key: require-webdev
 		read -r src; \
 		test -s "$$src" || { echo "nothing readable at $$src" >&2; exit 1; }; \
 	fi; \
-	$(DOCKER) cp "$$src" $(WEBDEV):/home/dev/.ssh/home_key; \
-	$(DOCKER) exec --user root $(WEBDEV) sh -c \
+	$(DOCKER) cp "$$src" $(NAME):/home/dev/.ssh/home_key; \
+	$(DOCKER) exec --user root $(NAME) sh -c \
 		"chown dev:dev /home/dev/.ssh /home/dev/.ssh/home_key && \
 		 chmod 700 /home/dev/.ssh && chmod 600 /home/dev/.ssh/home_key"; \
 	echo "git key installed from $$src"
@@ -424,7 +424,7 @@ key: require-webdev
 # Interactive, so it needs the tty that -it gives it. Suggests a password for a
 # new repository rather than asking you to invent one.
 restic: require-webdev
-	@$(DOCKER) exec -it $(WEBDEV) restic-setup
+	@$(DOCKER) exec -it $(NAME) restic-setup
 
 # Run out of the checkout rather than the container, so a password can be minted
 # before there is anything to put it in. Nothing is written either way, and the
@@ -433,20 +433,20 @@ password:
 	@sh containers/webdev/scripts/restic-setup.sh --password
 
 backup: require-webdev
-	@$(DOCKER) exec $(WEBDEV) restic-backup
+	@$(DOCKER) exec $(NAME) restic-backup
 
 verify: require-webdev
-	@$(DOCKER) exec $(WEBDEV) restic-check
+	@$(DOCKER) exec $(NAME) restic-check
 
 snapshots: require-webdev
-	@$(DOCKER) exec $(WEBDEV) restic-status
+	@$(DOCKER) exec $(NAME) restic-status
 
 # Moves anything already in the volumes aside before it writes, and says where.
 restore: require-webdev
-	@$(DOCKER) exec -it $(WEBDEV) restic-restore
+	@$(DOCKER) exec -it $(NAME) restic-restore
 
 sync: require-webdev
-	@$(DOCKER) exec $(WEBDEV) code-sync
+	@$(DOCKER) exec $(NAME) code-sync
 
 # /home/dev/.claude is a volume and shadows whatever the image puts there, so
 # these have to be linked into the running container. Safe to re-run.
@@ -459,72 +459,25 @@ dotfiles:
 	$(DOCKER) exec bythewood-webdev sh -c "$(LINKS)"
 	echo "claude skills, status line and neovim config linked"
 
-# The only step that reaches Hugging Face, weights land in the volume.
-# --list-devices cannot stand in for this, it exits before -hf is resolved.
+# The only step that reaches Hugging Face. A file path rather than llama-server's
+# -hf, so pi starts without the network. It runs in a throwaway container off
+# the webdev image, so it works before webdev has the volume, and a cut off
+# download picks up where it stopped.
 models:
-	-$(DOCKER) rm --force aiagent-fetch
-	$(DOCKER) run --detach --name aiagent-fetch --gpus all \
-		--env LLAMA_ARG_OFFLINE=false \
-		--volume bythewood-models:/models $(REGISTRY)/aiagent:latest
-	echo "downloading weights, several GB, this takes a while"
-	while ! $(DOCKER) exec aiagent-fetch curl -sf -o /dev/null http://127.0.0.1:8000/health 2>/dev/null; do \
-		$(DOCKER) ps -q -f name=aiagent-fetch | grep -q . || \
-			{ echo "fetch failed:"; $(DOCKER) logs --tail 20 aiagent-fetch; exit 1; }; \
-		sleep 10; \
-	done
-	$(DOCKER) rm --force aiagent-fetch >/dev/null
-	echo "weights are in the bythewood-models volume"
-
-# Where aiagent's key for the model gateway is kept, so replacing the container
-# does not lose it. KEY defaults to the ssh key path for `make key`, so only an
-# orch- prefixed value counts here and anything else means nothing was passed. Mint the key on the gateway first, which prints it once:
-#
-#     cd ~/code/orchard && make llm-key NAME=aiagent
-#
-# With no key here aiagent starts its own model instead, which is the right
-# answer on a machine that is not the one running the gateway.
-llm-key:
-	@$(DOCKER) volume create bythewood-llm >/dev/null
-	@key=""; \
-	case "$(KEY)" in orch-*) key="$(KEY)" ;; esac; \
-	if [ -z "$$key" ]; then \
-		if $(DOCKER) run --rm --volume bythewood-llm:/k debian:trixie-slim \
-			test -s /k/key 2>/dev/null; then \
-			echo "a gateway key is already stored, left alone"; \
-			echo "to replace it: make llm-key KEY=orch-..."; \
-			exit 0; \
+	$(DOCKER) volume create bythewood-models >/dev/null
+	$(DOCKER) run --rm --user 0 --volume bythewood-models:/models $(IMAGE) sh -c '\
+		set -e; mkdir -p /models/ornith; cd /models/ornith; \
+		f=Ornith-1.5-9B-Q4_K_M.gguf; \
+		if [ -s $$f ]; then echo "$$f is already in the volume"; else \
+			curl -fL -C - -o $$f.part "$(ORNITH_URL)"; \
+			echo "$(ORNITH_SHA256)  $$f.part" | sha256sum -c - || { rm -f $$f.part; exit 1; }; \
+			mv $$f.part $$f; \
 		fi; \
-		echo "mint one on the gateway first: cd ~/code/orchard && make llm-key NAME=aiagent"; \
-		printf 'paste the key it printed: '; \
-		read -r key; \
-	fi; \
-	case "$$key" in orch-*) ;; *) echo "that does not look like a gateway key" >&2; exit 1 ;; esac; \
-	printf '%s' "$$key" | $(DOCKER) run --rm -i \
-		--volume bythewood-llm:/k debian:trixie-slim \
-		sh -c 'cat > /k/key && chmod 600 /k/key && chown 1001:1001 /k/key'; \
-	echo "key stored. it takes effect on the next: make update C=aiagent"
-
-# A one-off in the foreground, so it neither rebuilds the image nor disturbs the
-# aiagent container. Weights it pulls stay in the volume.
-serve:
-	@test -n "$(MODEL)" || { \
-		echo "usage: make serve MODEL=<hf-repo>:<quant>" >&2; \
-		exit 1; \
-	}
-	$(DOCKER) run --rm --gpus all --volume bythewood-models:/models \
-		$(REGISTRY)/aiagent:latest -hf $(MODEL) --alias local
-
-require-container:
-	@test -d "containers/$(C)" || { \
-		echo "there is no container called '$(C)'. one of:" >&2; \
-		echo "  webdev" >&2; \
-		echo "  aiagent" >&2; \
-		exit 1; \
-	}
+		chown -R 1001:1001 /models'
 
 require-webdev:
-	@$(DOCKER) inspect --format '{{.State.Running}}' $(WEBDEV) 2>/dev/null | grep -q true || { \
-		echo "$(WEBDEV) is not running, and this target works inside it." >&2; \
+	@$(DOCKER) inspect --format '{{.State.Running}}' $(NAME) 2>/dev/null | grep -q true || { \
+		echo "$(NAME) is not running, and this target works inside it." >&2; \
 		echo "start it with: make up" >&2; \
 		exit 1; \
 	}

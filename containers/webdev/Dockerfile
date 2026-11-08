@@ -1,7 +1,8 @@
 # webdev
 #
-# Debian 13. Go, Python (uv), Bun, Claude Code, Docker CLI, gh, typst, Playwright.
-# No nodejs, no npm, no Rust. Work lives in the four bythewood-* volumes, so the
+# Debian 13. Go, Python (uv), Bun, Claude Code, Docker CLI, gh, typst, Playwright,
+# and the pi coding agent with Ornith 1.5 9B served on the GPU by llama.cpp. No
+# nodejs, no npm, no Rust. Work lives in the bythewood-* volumes, so the
 # container itself is disposable.
 #
 # Driven by the Makefile at the root of this repo, which is also the build
@@ -11,6 +12,7 @@
 #     make update      rebuild this image and replace the running container
 #     make doctor      what exists, what is running, and what to type next
 #     make shell       get in, via tmux
+#     make models      fetch Ornith's weights once, then type: pi
 #
 # A machine that has never run this needs Docker, then one command, which the
 # docs/recovery.md shows running from a throwaway container when there's no make:
@@ -24,7 +26,47 @@
 # the host browser. Bind mounts under /home/dev silently mount empty, because
 # the daemon resolves paths on the host, so use named volumes.
 
-FROM debian:trixie-slim@sha256:62bd423aeee912639ca8ee681c2b762cb3e25137e0a92b20be455898a9f034ad
+
+# llama-server for pi. Every instruction here matches orchard's llm model server
+# line for line, so both share one cached CUDA build and make update doesn't
+# compile it again. Comments don't count toward the cache, instructions do.
+FROM debian:trixie-slim@sha256:62bd423aeee912639ca8ee681c2b762cb3e25137e0a92b20be455898a9f034ad AS llama
+
+ARG CUDA=13-3
+
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+        ca-certificates curl git cmake ninja-build build-essential \
+        libcurl4-openssl-dev && \
+    curl -fsSLo /tmp/keyring.deb https://developer.download.nvidia.com/compute/cuda/repos/debian13/x86_64/cuda-keyring_1.1-1_all.deb && \
+    dpkg -i /tmp/keyring.deb && \
+    apt-get update && \
+    apt-get install -y --no-install-recommends \
+        cuda-nvcc-${CUDA} cuda-cudart-dev-${CUDA} libcublas-dev-${CUDA} && \
+    rm -rf /var/lib/apt/lists/* /tmp/keyring.deb
+
+ENV PATH=/usr/local/cuda/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+
+ARG LLAMA_REF=v0.6.0
+RUN git clone --depth 1 --branch ${LLAMA_REF} https://github.com/ggml-org/llama.cpp /tmp/src && \
+    cmake -S /tmp/src -B /tmp/build -G Ninja \
+        -DCMAKE_BUILD_TYPE=Release \
+        -DBUILD_SHARED_LIBS=OFF \
+        -DGGML_CUDA=ON \
+        -DCMAKE_CUDA_ARCHITECTURES=86 \
+        -DGGML_CUDA_FA_ALL_QUANTS=ON \
+        -DGGML_NATIVE=OFF \
+        -DLLAMA_CURL=ON \
+        -DLLAMA_BUILD_TESTS=OFF \
+        -DLLAMA_BUILD_EXAMPLES=OFF && \
+    cmake --build /tmp/build --target llama-server -j"$(nproc)" && \
+    strip /tmp/build/bin/llama-server
+
+
+FROM debian:trixie-slim@sha256:62bd423aeee912639ca8ee681c2b762cb3e25137e0a92b20be455898a9f034ad AS webdev
+
+# Has to match the llama stage, since llama-server links this CUDA runtime.
+ARG CUDA=13-3
 
 # BUN_INSTALL is persistent: it also decides where `bun install -g` puts globals.
 ENV DEBIAN_FRONTEND=noninteractive \
@@ -39,6 +81,9 @@ ENV DEBIAN_FRONTEND=noninteractive \
 # Client only, never the daemon. jq is required by code-sync, and there is no
 # pip or python3-venv because uv covers both. The upgrade is what brings in
 # Debian's security fixes, since the base above is pinned by digest.
+#
+# NVIDIA's repo is only for the CUDA runtime llama-server needs. The driver
+# comes in from Windows through --gpus and never gets installed in here.
 RUN apt-get update && \
     apt-get upgrade -y && \
     apt-get install -y --no-install-recommends ca-certificates curl && \
@@ -47,13 +92,19 @@ RUN apt-get update && \
     chmod a+r /etc/apt/keyrings/docker.asc && \
     printf 'Types: deb\nURIs: https://download.docker.com/linux/debian\nSuites: trixie\nComponents: stable\nArchitectures: amd64\nSigned-By: /etc/apt/keyrings/docker.asc\n' \
         > /etc/apt/sources.list.d/docker.sources && \
+    curl -fsSLo /tmp/keyring.deb https://developer.download.nvidia.com/compute/cuda/repos/debian13/x86_64/cuda-keyring_1.1-1_all.deb && \
+    dpkg -i /tmp/keyring.deb && \
     apt-get update && \
     apt-get install -y --no-install-recommends \
         git rsync neovim openssh-client tmux \
         unzip xz-utils btop tree sudo jq restic sqlite3 poppler-utils \
-        build-essential tzdata python3 \
+        build-essential tzdata python3 procps ripgrep fd-find \
+        dnsutils iputils-ping iproute2 netcat-openbsd traceroute mtr-tiny whois \
+        libgomp1 cuda-cudart-${CUDA} libcublas-${CUDA} \
         docker-ce-cli docker-compose-plugin docker-buildx-plugin && \
-    rm -rf /var/lib/apt/lists/*
+    rm -rf /var/lib/apt/lists/* /tmp/keyring.deb
+
+COPY --from=llama /tmp/build/bin/llama-server /usr/local/bin/llama-server
 
 RUN curl -fsSL https://astral.sh/uv/install.sh | env UV_INSTALL_DIR=/usr/local/bin sh && \
     curl -fsSL https://bun.sh/install | bash
@@ -113,6 +164,13 @@ RUN bun install -g @playwright/cli@${PLAYWRIGHT_CLI_VERSION} && \
     test -x /opt/google/chrome/chrome && \
     rm -rf /var/lib/apt/lists/*
 
+# pi runs under the node shim above, and its package installs go through bun,
+# see the settings.json below. ~/scripts/pi shadows this one on PATH to bring
+# the model up first, so call it by full path to skip that.
+ARG PI_VERSION=1.5.0
+RUN bun install -g @earendil-works/pi-coding-agent@${PI_VERSION} && \
+    pi --version
+
 RUN ln -snf /usr/share/zoneinfo/UTC /etc/localtime && echo "UTC" > /etc/timezone
 
 # Debian's /etc/profile assigns PATH outright, so a login shell (what tmux panes
@@ -142,7 +200,7 @@ RUN git clone --quiet --depth 1 --branch v1.18.0 \
     rm -rf /home/dev/.config/nvim/pack/dev/start/nvim-tree.lua/.git
 
 # .claude.json lives in the volume so auth survives a rebuild.
-RUN mkdir -p /home/dev/code /home/dev/.claude /home/dev/.ssh /home/dev/.restic && \
+RUN mkdir -p /home/dev/code /home/dev/.claude /home/dev/.ssh /home/dev/.restic /models && \
     for f in /home/dev/scripts/*.sh; do mv "$f" "${f%.sh}"; done && \
     chmod +x /home/dev/scripts/* && \
     echo "source ~/.bash_aliases" >> /home/dev/.bashrc && \
@@ -162,11 +220,43 @@ RUN mkdir -p /home/dev/code /home/dev/.claude /home/dev/.ssh /home/dev/.restic &
     > /home/dev/.ssh/config && \
     chmod 700 /home/dev/.ssh /home/dev/.restic && \
     chmod 600 /home/dev/.ssh/config && \
-    chown -R dev:dev /home/dev
+    chown -R dev:dev /home/dev /models
 
 WORKDIR /home/dev
 USER dev
 
 RUN curl -fsSL https://claude.ai/install.sh | bash
+
+# pi walks up from its cwd to find this, and takes it over ~/CLAUDE.md.
+COPY --chown=dev:dev containers/webdev/AGENTS.md /home/dev/AGENTS.md
+
+# npmCommand is what lets pi install packages with bun instead of npm. The
+# server runs with reasoning off and qwen-chat-template is how pi turns it on
+# per turn, since off skims files. contextWindow has to match the --ctx-size in
+# scripts/pi.sh or pi compacts too late and the server refuses the turn.
+#
+# web-search.json pins duckduckgo because the default chain ends at Exa's
+# public endpoint when no API keys are set, and workflow "none" because the
+# default blocks on a browser curator that never opens in a container.
+#
+# pi fetches its own rg and fd on first run, which offline mode blocks, so the
+# packaged ones are linked where it looks.
+ARG PI_WEB_ACCESS_VERSION=0.47.0
+RUN mkdir -p /home/dev/.pi/agent/bin && \
+    ln -s /usr/bin/rg /home/dev/.pi/agent/bin/rg && \
+    ln -s /usr/bin/fdfind /home/dev/.pi/agent/bin/fd && \
+    printf '%s' '{"npmCommand":["bun"],"enableInstallTelemetry":false,"enableAnalytics":false,"defaultThinkingLevel":"medium"}' \
+        > /home/dev/.pi/agent/settings.json && \
+    BUN_INSTALL_CACHE_DIR=/tmp/bun-cache /usr/local/bin/pi install npm:pi-web-access@${PI_WEB_ACCESS_VERSION} && \
+    rm -rf /tmp/bun-cache && \
+    printf '%s' '{"providers":{"local":{"baseUrl":"http://127.0.0.1:8080/v1","api":"openai-completions","apiKey":"none","compat":{"supportsDeveloperRole":false,"supportsReasoningEffort":false,"thinkingFormat":"qwen-chat-template"},"models":[{"id":"local","name":"Ornith 1.5 9B","reasoning":true,"contextWindow":65536,"maxTokens":8192,"input":["text"],"cost":{"input":0,"output":0,"cacheRead":0,"cacheWrite":0}}]}}}' \
+        > /home/dev/.pi/agent/models.json && \
+    printf '%s' '{"searchProvider":"duckduckgo","workflow":"none","autoOpenBrowser":false}' \
+        > /home/dev/.pi/web-search.json
+
+# Set after the install above so it cannot block the build.
+ENV PI_OFFLINE=1 \
+    PI_SKIP_VERSION_CHECK=1 \
+    PI_TELEMETRY=0
 
 CMD ["sleep", "infinity"]
