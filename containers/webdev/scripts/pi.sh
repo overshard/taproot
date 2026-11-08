@@ -14,7 +14,7 @@
 set -eu
 
 PI=/usr/local/bin/pi
-MODEL=/models/ornith/Ornith-1.5-9B-uncensored.Q4_K_M.gguf
+MODEL=/models/ornith/Ornith-1.5-9B-heretic-Q4_K_M.gguf
 # The abliterated GGUF ships the plain upstream template, which raises on a
 # system message anywhere but first, so the stock one rides beside it.
 TEMPLATE=/usr/local/share/ornith/chat-template.jinja
