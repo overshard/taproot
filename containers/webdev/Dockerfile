@@ -251,7 +251,7 @@ RUN mkdir -p /home/dev/.pi/agent/bin && \
         > /home/dev/.pi/agent/settings.json && \
     BUN_INSTALL_CACHE_DIR=/tmp/bun-cache /usr/local/bin/pi install npm:pi-web-access@${PI_WEB_ACCESS_VERSION} && \
     rm -rf /tmp/bun-cache && \
-    printf '%s' '{"providers":{"local":{"baseUrl":"http://127.0.0.1:8080/v1","api":"openai-completions","apiKey":"none","compat":{"supportsDeveloperRole":false,"supportsReasoningEffort":false,"thinkingFormat":"qwen-chat-template"},"models":[{"id":"local","name":"Ornith 1.5 9B uncensored","reasoning":true,"contextWindow":65536,"maxTokens":8192,"input":["text"],"cost":{"input":0,"output":0,"cacheRead":0,"cacheWrite":0}}]}}}' \
+    printf '%s' '{"providers":{"local":{"baseUrl":"http://127.0.0.1:8080/v1","api":"openai-completions","apiKey":"none","compat":{"supportsDeveloperRole":false,"supportsReasoningEffort":false,"thinkingFormat":"qwen-chat-template"},"models":[{"id":"local","name":"Ornith 1.5 9B heretic","reasoning":true,"contextWindow":65536,"maxTokens":8192,"input":["text"],"cost":{"input":0,"output":0,"cacheRead":0,"cacheWrite":0}}]}}}' \
         > /home/dev/.pi/agent/models.json && \
     printf '%s' '{"searchProvider":"duckduckgo","workflow":"none","autoOpenBrowser":false}' \
         > /home/dev/.pi/web-search.json

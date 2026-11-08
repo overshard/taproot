@@ -43,8 +43,8 @@ RUN_ARGS = --detach --name $(NAME) --hostname $(NAME) --init \
 	--volume bythewood-models:/models \
 	--volume /var/run/docker.sock:/var/run/docker.sock
 
-ORNITH_URL = https://huggingface.co/mradermacher/Ornith-1.5-9B-uncensored-GGUF/resolve/main/Ornith-1.5-9B-uncensored.Q4_K_M.gguf
-ORNITH_SHA256 = ee180b66bc2dcd49f41e0d3c991d2eaab3078d651d97595852d16ae6d9af3c9e
+ORNITH_URL = https://huggingface.co/Thunder13240/Ornith-1.5-9B-heretic-GGUF/resolve/main/Ornith-1.5-9B-heretic-Q4_K_M.gguf
+ORNITH_SHA256 = 8d9f2f3350e3be49520028652b154463df5755dc757219b874a33208c8959744
 
 .DEFAULT_GOAL := help
 
@@ -377,7 +377,7 @@ doctor:
 	else \
 		echo "  claude dotfiles MISSING  -> make dotfiles"; \
 	fi; \
-	if $(DOCKER) exec $(NAME) test -s /models/ornith/Ornith-1.5-9B-uncensored.Q4_K_M.gguf 2>/dev/null; then \
+	if $(DOCKER) exec $(NAME) test -s /models/ornith/Ornith-1.5-9B-heretic-Q4_K_M.gguf 2>/dev/null; then \
 		echo "  pi weights      ok"; \
 	else \
 		echo "  pi weights      MISSING  -> make models"; \
@@ -467,7 +467,7 @@ models:
 	$(DOCKER) volume create bythewood-models >/dev/null
 	$(DOCKER) run --rm --user 0 --volume bythewood-models:/models $(IMAGE) sh -c '\
 		set -e; mkdir -p /models/ornith; cd /models/ornith; \
-		f=Ornith-1.5-9B-uncensored.Q4_K_M.gguf; \
+		f=Ornith-1.5-9B-heretic-Q4_K_M.gguf; \
 		if [ -s $$f ]; then echo "$$f is already in the volume"; else \
 			curl -fL -C - -o $$f.part "$(ORNITH_URL)"; \
 			echo "$(ORNITH_SHA256)  $$f.part" | sha256sum -c - || { rm -f $$f.part; exit 1; }; \
