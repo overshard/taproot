@@ -142,10 +142,23 @@ RUN curl -fsSL -o /tmp/gh.tar.gz \
     rm -rf /tmp/gh.tar.gz "/tmp/gh_${GH_VERSION}_linux_amd64" && \
     gh --version
 
+RUN ln -snf /usr/share/zoneinfo/UTC /etc/localtime && echo "UTC" > /etc/timezone
+
 # The pin matters. 0.1.14 drives a page, while 0.1.18 and unpinned both die with
 # "No usable sandbox" under Docker on WSL2, so drive a real page after
-
-RUN ln -snf /usr/share/zoneinfo/UTC /etc/localtime && echo "UTC" > /etc/timezone
+# any bump. Some tools want Chrome at the /opt path, hence the symlink.
+ARG PLAYWRIGHT_CLI_VERSION=0.1.14
+ENV PLAYWRIGHT_BROWSERS_PATH=/opt/playwright-browsers
+RUN bun install -g @playwright/cli@${PLAYWRIGHT_CLI_VERSION} && \
+    playwright-cli --help >/dev/null && \
+    CORE="$(find /usr/local/install/global -path '*/playwright-core/cli.js' | head -1)" && \
+    test -n "$CORE" && \
+    node "$CORE" install --with-deps chromium && \
+    chmod -R a+rx /opt/playwright-browsers && \
+    mkdir -p /opt/google/chrome && \
+    ln -snf /opt/playwright-browsers/chromium-*/chrome-linux64/chrome /opt/google/chrome/chrome && \
+    test -x /opt/google/chrome/chrome && \
+    rm -rf /var/lib/apt/lists/*
 
 # Debian's /etc/profile assigns PATH outright, so a login shell (what tmux panes
 # get) drops everything the ENV added. The ENV still covers plain `docker exec`.
@@ -213,23 +226,6 @@ RUN apt-get update && \
     rm -rf /var/lib/apt/lists/* /tmp/keyring.deb
 
 COPY --from=llama /tmp/build/bin/llama-server /usr/local/bin/llama-server
-
-
-# The pin matters. 0.1.14 drives a page, while 0.1.18 and unpinned both die with
-# "No usable sandbox" under Docker on WSL2, so drive a real page after
-# any bump. Some tools want Chrome at the /opt path, hence the symlink.
-ARG PLAYWRIGHT_CLI_VERSION=0.1.14
-ENV PLAYWRIGHT_BROWSERS_PATH=/opt/playwright-browsers
-RUN bun install -g @playwright/cli@${PLAYWRIGHT_CLI_VERSION} && \
-    playwright-cli --help >/dev/null && \
-    CORE="$(find /usr/local/install/global -path '*/playwright-core/cli.js' | head -1)" && \
-    test -n "$CORE" && \
-    node "$CORE" install --with-deps chromium && \
-    chmod -R a+rx /opt/playwright-browsers && \
-    mkdir -p /opt/google/chrome && \
-    ln -snf /opt/playwright-browsers/chromium-*/chrome-linux64/chrome /opt/google/chrome/chrome && \
-    test -x /opt/google/chrome/chrome && \
-    rm -rf /var/lib/apt/lists/*
 
 # pi runs under the node shim above, and its package installs go through bun,
 # see the settings.json below. ~/scripts/pi shadows this one on PATH to bring
