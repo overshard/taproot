@@ -99,7 +99,7 @@ RUN apt-get update && \
         git rsync neovim openssh-client tmux \
         unzip xz-utils btop tree sudo jq restic sqlite3 poppler-utils \
         build-essential tzdata python3 procps ripgrep fd-find \
-        dnsutils iputils-ping iproute2 netcat-openbsd traceroute mtr-tiny whois \
+        dnsutils iputils-ping iproute2 netcat-openbsd traceroute mtr-tiny whois wireguard-tools \
         libgomp1 cuda-cudart-${CUDA} libcublas-${CUDA} \
         docker-ce-cli docker-compose-plugin docker-buildx-plugin && \
     rm -rf /var/lib/apt/lists/* /tmp/keyring.deb
@@ -261,4 +261,6 @@ ENV PI_OFFLINE=1 \
     PI_SKIP_VERSION_CHECK=1 \
     PI_TELEMETRY=0
 
-CMD ["sleep", "infinity"]
+# The WireGuard peer for the OVH VPS. Its conf holds a private key so it lives in
+# the ssh volume, and a missing conf or a failed tunnel never stops the container.
+CMD ["sh", "-c", "[ -f /home/dev/.ssh/wg0.conf ] && sudo wg-quick up /home/dev/.ssh/wg0.conf; exec sleep infinity"]

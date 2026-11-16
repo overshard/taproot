@@ -34,6 +34,7 @@ IMAGE = $(REGISTRY)/webdev:latest
 GPUS = $(shell $(DOCKER) info --format '{{range $$k, $$v := .Runtimes}}{{$$k}} {{end}}' 2>/dev/null | grep -qw nvidia && echo --gpus all)
 
 RUN_ARGS = --detach --name $(NAME) --hostname $(NAME) --init \
+	--cap-add NET_ADMIN \
 	--restart unless-stopped $(GPUS) \
 	--publish 8000:8000 \
 	--volume bythewood-code:/home/dev/code \
@@ -142,6 +143,9 @@ wsl:
 	sudo systemctl enable --now docker
 	sudo systemctl restart docker
 	sudo usermod -aG docker $$USER
+# webdev runs a WireGuard peer and a container can't load kernel modules.
+	echo wireguard | sudo tee /etc/modules-load.d/wireguard.conf >/dev/null
+	sudo modprobe wireguard
 # Security updates apply themselves. Debian's default origin list is only
 # trixie-security, so docker and the toolkit are left for a deliberate apt
 # upgrade rather than restarting the daemon under the running containers.
