@@ -16,7 +16,7 @@ services:
     hostname: vps
     init: true
     restart: unless-stopped
-    working_dir: /home/dev/code
+    working_dir: /home/dev
     volumes:
       - claude-code:/home/dev/code
       - claude-home:/home/dev/.claude
