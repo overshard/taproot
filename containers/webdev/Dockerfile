@@ -93,7 +93,7 @@ RUN apt-get update && \
         > /etc/apt/sources.list.d/docker.sources && \
     apt-get update && \
     apt-get install -y --no-install-recommends \
-        git rsync openssh-client \
+        git rsync openssh-client restic \
         unzip xz-utils tree sudo jq sqlite3 poppler-utils \
         build-essential tzdata python3 procps ripgrep fd-find \
         dnsutils iputils-ping iproute2 netcat-openbsd traceroute mtr-tiny whois \
@@ -175,8 +175,14 @@ RUN useradd -m -u 1001 -G sudo -s /bin/bash dev && \
 COPY dotfiles/bash_aliases /home/dev/.bash_aliases
 COPY dotfiles/gitconfig /home/dev/.gitconfig
 
+COPY containers/webdev/scripts/code-sync.sh containers/webdev/scripts/restic-*.sh \
+    containers/webdev/scripts/orchard-dump.sh /home/dev/scripts/
+
 # .claude.json lives in the volume so auth survives a rebuild.
-RUN mkdir -p /home/dev/code /home/dev/.claude /home/dev/.ssh && \
+RUN mkdir -p /home/dev/code /home/dev/.claude /home/dev/.ssh /home/dev/.restic && \
+    for f in /home/dev/scripts/*.sh; do mv "$f" "${f%.sh}"; done && \
+    chmod +x /home/dev/scripts/* && \
+    chmod 700 /home/dev/.restic && \
     echo "source ~/.bash_aliases" >> /home/dev/.bashrc && \
     ln -s /home/dev/.claude/.claude.json /home/dev/.claude.json && \
     ln -s code/memory/workspace.md /home/dev/CLAUDE.md && \
@@ -205,7 +211,7 @@ RUN curl -fsSL https://claude.ai/install.sh | bash
 CMD ["claude", "remote-control", "--no-create-session-in-dir", "--permission-mode", "auto", "--capacity", "4"]
 
 
-# webdev, the desk. claude plus neovim, tmux, restic, the WireGuard peer, and pi
+# webdev, the desk. claude plus neovim, tmux, the WireGuard peer, and pi
 # with Ornith on the GPU through llama.cpp. It stays the last stage so a plain
 # docker build still gives webdev.
 FROM claude AS webdev
@@ -221,7 +227,7 @@ RUN apt-get update && \
     dpkg -i /tmp/keyring.deb && \
     apt-get update && \
     apt-get install -y --no-install-recommends \
-        neovim tmux btop restic wireguard-tools \
+        neovim tmux btop wireguard-tools \
         libgomp1 cuda-cudart-${CUDA} libcublas-${CUDA} && \
     rm -rf /var/lib/apt/lists/* /tmp/keyring.deb
 
@@ -238,7 +244,7 @@ COPY dotfiles/neovim/init.lua /home/dev/.config/nvim/init.lua
 COPY dotfiles/tmux.conf /home/dev/.tmux.conf
 # The template ornith-ai's own GGUF carries, see scripts/pi.sh.
 COPY containers/webdev/ornith.jinja /usr/local/share/ornith/chat-template.jinja
-COPY containers/webdev/scripts/ /home/dev/scripts/
+COPY containers/webdev/scripts/pi.sh /home/dev/scripts/
 
 # The file tree sidebar, as a native package so there is no plugin manager and
 # nothing to fetch on first run. Pinned because nvim here is 0.10, which is the
@@ -248,10 +254,9 @@ RUN git clone --quiet --depth 1 --branch v1.18.0 \
         /home/dev/.config/nvim/pack/dev/start/nvim-tree.lua && \
     rm -rf /home/dev/.config/nvim/pack/dev/start/nvim-tree.lua/.git
 
-RUN mkdir -p /home/dev/.restic /models && \
-    for f in /home/dev/scripts/*.sh; do mv "$f" "${f%.sh}"; done && \
-    chmod +x /home/dev/scripts/* && \
-    chmod 700 /home/dev/.restic && \
+RUN mkdir -p /models && \
+    mv /home/dev/scripts/pi.sh /home/dev/scripts/pi && \
+    chmod +x /home/dev/scripts/pi && \
     chown -R dev:dev /home/dev /models
 
 WORKDIR /home/dev

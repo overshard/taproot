@@ -202,12 +202,12 @@ ask_secret "B2 applicationKey" "$B2_KEY"; NEW_KEY=$ANSWER
 # Retention is applied per host, so a typo here quietly gives a third machine
 # its own 7/4/6 window and stops pruning the real one.
 while :; do
-    ask "this machine, desktop or laptop" "$HOSTTAG"
+    ask "this machine, desktop, laptop or vps" "$HOSTTAG"
     NEW_HOST=$ANSWER
     case "$NEW_HOST" in
-    desktop|laptop) break ;;
+    desktop|laptop|vps) break ;;
     "") echo "  nothing entered, and nothing to keep" ;;
-    *)  echo "  must be exactly 'desktop' or 'laptop'" ;;
+    *)  echo "  must be exactly 'desktop', 'laptop' or 'vps'" ;;
     esac
 done
 

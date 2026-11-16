@@ -21,9 +21,15 @@ services:
       - claude-code:/home/dev/code
       - claude-home:/home/dev/.claude
       - claude-ssh:/home/dev/.ssh
+      - claude-restic:/home/dev/.restic
+      - orchard-backup:/home/dev/orchard-backup
       - /var/run/docker.sock:/var/run/docker.sock
 
 volumes:
   claude-code:
   claude-home:
   claude-ssh:
+  claude-restic:
+  # orchard-dump writes to it by this name from a throwaway container.
+  orchard-backup:
+    name: claude-orchard-backup

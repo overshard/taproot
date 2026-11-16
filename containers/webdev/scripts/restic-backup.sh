@@ -7,7 +7,7 @@
 # initializes the repo on first run and prunes to 7 daily, 4 weekly and 6
 # monthly after each successful backup.
 #
-# Snapshots are tagged with --host so desktop and laptop stay distinct in the
+# Snapshots are tagged with --host so desktop, laptop and vps stay distinct in the
 # shared repo, and retention applies per host and paths, so each machine keeps
 # its own window.
 #
@@ -18,6 +18,9 @@
 # A directory holding a .nobackup file is skipped, for data that stays local.
 # Claude Code's background jobs keep scratch under jobs/*/tmp, which has held
 # gigabytes of core dumps and copied databases.
+#
+# On the VPS ~/orchard-backup is a volume, and orchard-dump fills it with a
+# consistent copy of orchard's volumes first, so those go to B2 as well.
 #
 # Credentials live in ~/.restic/, mounted from the bythewood-restic volume, and
 # restic-setup is what writes them:
@@ -40,6 +43,13 @@ fi
 if ! restic cat config >/dev/null 2>&1; then
     echo "Repository not initialized. Running restic init..."
     restic init
+fi
+
+dump_exit=0
+orchard=""
+if [ -d "$HOME/orchard-backup" ]; then
+    orchard-dump || dump_exit=$?
+    orchard="$HOME/orchard-backup"
 fi
 
 # Exit codes are captured rather than left to set -e, since a partial backup
@@ -65,7 +75,7 @@ restic backup \
     --exclude="$HOME/.claude/jobs/*/tmp" \
     "$HOME/.claude" \
     "$HOME/code" \
-    "$HOME/.ssh" || backup_exit=$?
+    "$HOME/.ssh" $orchard || backup_exit=$?
 
 prune_exit=0
 restic forget --prune \
@@ -74,7 +84,9 @@ restic forget --prune \
     --keep-weekly  4 \
     --keep-monthly 6 || prune_exit=$?
 
-if [ "$backup_exit" -ne 0 ] || [ "$prune_exit" -ne 0 ]; then
-    echo "backup exit ${backup_exit}, prune exit ${prune_exit}" >&2
-    exit "$(( backup_exit > prune_exit ? backup_exit : prune_exit ))"
+worst=$(( backup_exit > prune_exit ? backup_exit : prune_exit ))
+worst=$(( worst > dump_exit ? worst : dump_exit ))
+if [ "$worst" -ne 0 ]; then
+    echo "dump exit ${dump_exit}, backup exit ${backup_exit}, prune exit ${prune_exit}" >&2
+    exit "$worst"
 fi

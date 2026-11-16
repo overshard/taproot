@@ -8,8 +8,18 @@ the last snapshot is. Retention is 7 daily, 4 weekly and 6 monthly per host,
 pruned after each backup. Passwords and B2 keys live in Bitwarden.
 
 There is one repository, `b2:overshard-backups:webdev`, holding per-machine
-snapshots of `~/.claude`, `~/code` and `~/.ssh` from desktop and laptop, each
-tagged with `$RESTIC_HOST`.
+snapshots of `~/.claude`, `~/code` and `~/.ssh` from desktop, laptop and vps,
+each tagged with `$RESTIC_HOST`.
+
+On the VPS the `claude` container does the same job, and the snapshot also has
+`~/orchard-backup`, a copy of every orchard volume except logging and
+llm-models that `orchard-dump` takes right before. Databases in it come from
+`sqlite3 .backup`, so they're consistent even though the sites are running.
+To put one back, stop that site, restore the snapshot, and copy its directory
+from `orchard-backup/` into the volume.
+
+The VPS has no make, so its timers are the same three units with
+`docker exec claude` in place of `bythewood-webdev`, written by hand.
 
 `make restic` is the way in. It reports what is set, verifies it by actually
 opening the repository, prompts for anything missing, and writes both files at
@@ -37,6 +47,7 @@ there:
 | `restic-backup`  | `make backup` | Restic backup to B2, run nightly by the host timer, snapshot tagged with `$RESTIC_HOST` |
 | `restic-check`   | `make verify` | Read back 5% of the repo, run weekly by the host timer |
 | `restic-alert`   | | Push a phone alert through ntfy, called when either timer fails |
+| `orchard-dump`   | | Copy orchard's volumes into `~/orchard-backup`, which restic-backup runs on the VPS |
 | `restic-restore` | `make restore` | Pull latest snapshot from B2, existing data archived first |
 | `restic-status`  | `make snapshots` | Last snapshot per host, plus repo size. `--age` is what doctor uses |
 | `code-sync`      | `make sync` | Pull every repo under `~/code/`, then clone any new ones from GitHub |
