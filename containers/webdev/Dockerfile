@@ -5,6 +5,9 @@
 # nodejs, no npm, no Rust. Work lives in the bythewood-* volumes, so the
 # container itself is disposable.
 #
+# The claude stage is the shared base and is also its own image, the VPS's
+# Claude Code container, built by containers/claude/compose.yml.
+#
 # Driven by the Makefile at the root of this repo, which is also the build
 # context, and where every command lives. From a clone:
 #
@@ -63,10 +66,9 @@ RUN git clone --depth 1 --branch ${LLAMA_REF} https://github.com/ggml-org/llama.
     strip /tmp/build/bin/llama-server
 
 
-FROM debian:trixie-slim@sha256:62bd423aeee912639ca8ee681c2b762cb3e25137e0a92b20be455898a9f034ad AS webdev
-
-# Has to match the llama stage, since llama-server links this CUDA runtime.
-ARG CUDA=13-3
+# claude, everything webdev and the VPS container share. On the VPS it runs
+# Claude Code's remote control and nothing else, so no desk tools in here.
+FROM debian:trixie-slim@sha256:62bd423aeee912639ca8ee681c2b762cb3e25137e0a92b20be455898a9f034ad AS claude
 
 # BUN_INSTALL is persistent: it also decides where `bun install -g` puts globals.
 ENV DEBIAN_FRONTEND=noninteractive \
@@ -81,9 +83,6 @@ ENV DEBIAN_FRONTEND=noninteractive \
 # Client only, never the daemon. jq is required by code-sync, and there is no
 # pip or python3-venv because uv covers both. The upgrade is what brings in
 # Debian's security fixes, since the base above is pinned by digest.
-#
-# NVIDIA's repo is only for the CUDA runtime llama-server needs. The driver
-# comes in from Windows through --gpus and never gets installed in here.
 RUN apt-get update && \
     apt-get upgrade -y && \
     apt-get install -y --no-install-recommends ca-certificates curl && \
@@ -92,19 +91,14 @@ RUN apt-get update && \
     chmod a+r /etc/apt/keyrings/docker.asc && \
     printf 'Types: deb\nURIs: https://download.docker.com/linux/debian\nSuites: trixie\nComponents: stable\nArchitectures: amd64\nSigned-By: /etc/apt/keyrings/docker.asc\n' \
         > /etc/apt/sources.list.d/docker.sources && \
-    curl -fsSLo /tmp/keyring.deb https://developer.download.nvidia.com/compute/cuda/repos/debian13/x86_64/cuda-keyring_1.1-1_all.deb && \
-    dpkg -i /tmp/keyring.deb && \
     apt-get update && \
     apt-get install -y --no-install-recommends \
-        git rsync neovim openssh-client tmux \
-        unzip xz-utils btop tree sudo jq restic sqlite3 poppler-utils \
+        git rsync openssh-client \
+        unzip xz-utils tree sudo jq sqlite3 poppler-utils \
         build-essential tzdata python3 procps ripgrep fd-find \
-        dnsutils iputils-ping iproute2 netcat-openbsd traceroute mtr-tiny whois wireguard-tools \
-        libgomp1 cuda-cudart-${CUDA} libcublas-${CUDA} \
+        dnsutils iputils-ping iproute2 netcat-openbsd traceroute mtr-tiny whois \
         docker-ce-cli docker-compose-plugin docker-buildx-plugin && \
-    rm -rf /var/lib/apt/lists/* /tmp/keyring.deb
-
-COPY --from=llama /tmp/build/bin/llama-server /usr/local/bin/llama-server
+    rm -rf /var/lib/apt/lists/*
 
 RUN curl -fsSL https://astral.sh/uv/install.sh | env UV_INSTALL_DIR=/usr/local/bin sh && \
     curl -fsSL https://bun.sh/install | bash
@@ -150,6 +144,79 @@ RUN curl -fsSL -o /tmp/gh.tar.gz \
 
 # The pin matters. 0.1.14 drives a page, while 0.1.18 and unpinned both die with
 # "No usable sandbox" under Docker on WSL2, so drive a real page after
+
+RUN ln -snf /usr/share/zoneinfo/UTC /etc/localtime && echo "UTC" > /etc/timezone
+
+# Debian's /etc/profile assigns PATH outright, so a login shell (what tmux panes
+# get) drops everything the ENV added. The ENV still covers plain `docker exec`.
+RUN printf '%s\n' \
+    'export PATH="/home/dev/.local/bin:/home/dev/scripts:/usr/local/go/bin:/home/dev/go/bin:$PATH"' \
+    > /etc/profile.d/10-dev-path.sh && chmod 644 /etc/profile.d/10-dev-path.sh
+
+# Everything in the bythewood-* volumes is owned by 1001 and Debian has no
+# default 1000 user, so an unpinned useradd takes 1000 and every volume mounts
+# owned by a stranger. Do not remove the -u.
+RUN useradd -m -u 1001 -G sudo -s /bin/bash dev && \
+    echo "dev ALL=(ALL) NOPASSWD: ALL" > /etc/sudoers.d/dev
+
+COPY dotfiles/bash_aliases /home/dev/.bash_aliases
+COPY dotfiles/gitconfig /home/dev/.gitconfig
+
+# .claude.json lives in the volume so auth survives a rebuild.
+RUN mkdir -p /home/dev/code /home/dev/.claude /home/dev/.ssh && \
+    echo "source ~/.bash_aliases" >> /home/dev/.bashrc && \
+    ln -s /home/dev/.claude/.claude.json /home/dev/.claude.json && \
+    ln -s code/memory/workspace.md /home/dev/CLAUDE.md && \
+    printf '%s\n' \
+    'Host *' \
+    '  IdentityFile ~/.ssh/home_key' \
+    '  IdentitiesOnly yes' \
+    '  StrictHostKeyChecking accept-new' \
+    '  UpdateHostKeys yes' \
+    '  HashKnownHosts yes' \
+    '  PasswordAuthentication no' \
+    '  ServerAliveInterval 60' \
+    '  ServerAliveCountMax 3' \
+    '  VisualHostKey yes' \
+    > /home/dev/.ssh/config && \
+    chmod 700 /home/dev/.ssh && \
+    chmod 600 /home/dev/.ssh/config && \
+    chown -R dev:dev /home/dev
+
+WORKDIR /home/dev
+USER dev
+
+RUN curl -fsSL https://claude.ai/install.sh | bash
+
+# Sessions are started from claude.ai or the app, so none is opened at boot.
+CMD ["claude", "remote-control", "--no-create-session-in-dir", "--permission-mode", "auto"]
+
+
+# webdev, the desk. claude plus neovim, tmux, restic, the WireGuard peer, and pi
+# with Ornith on the GPU through llama.cpp. It stays the last stage so a plain
+# docker build still gives webdev.
+FROM claude AS webdev
+USER root
+
+# Has to match the llama stage, since llama-server links this CUDA runtime.
+ARG CUDA=13-3
+
+# NVIDIA's repo is only for the CUDA runtime llama-server needs. The driver
+# comes in from Windows through --gpus and never gets installed in here.
+RUN apt-get update && \
+    curl -fsSLo /tmp/keyring.deb https://developer.download.nvidia.com/compute/cuda/repos/debian13/x86_64/cuda-keyring_1.1-1_all.deb && \
+    dpkg -i /tmp/keyring.deb && \
+    apt-get update && \
+    apt-get install -y --no-install-recommends \
+        neovim tmux btop restic wireguard-tools \
+        libgomp1 cuda-cudart-${CUDA} libcublas-${CUDA} && \
+    rm -rf /var/lib/apt/lists/* /tmp/keyring.deb
+
+COPY --from=llama /tmp/build/bin/llama-server /usr/local/bin/llama-server
+
+
+# The pin matters. 0.1.14 drives a page, while 0.1.18 and unpinned both die with
+# "No usable sandbox" under Docker on WSL2, so drive a real page after
 # any bump. Some tools want Chrome at the /opt path, hence the symlink.
 ARG PLAYWRIGHT_CLI_VERSION=0.1.14
 ENV PLAYWRIGHT_BROWSERS_PATH=/opt/playwright-browsers
@@ -171,22 +238,6 @@ ARG PI_VERSION=1.5.0
 RUN bun install -g @earendil-works/pi-coding-agent@${PI_VERSION} && \
     pi --version
 
-RUN ln -snf /usr/share/zoneinfo/UTC /etc/localtime && echo "UTC" > /etc/timezone
-
-# Debian's /etc/profile assigns PATH outright, so a login shell (what tmux panes
-# get) drops everything the ENV added. The ENV still covers plain `docker exec`.
-RUN printf '%s\n' \
-    'export PATH="/home/dev/.local/bin:/home/dev/scripts:/usr/local/go/bin:/home/dev/go/bin:$PATH"' \
-    > /etc/profile.d/10-dev-path.sh && chmod 644 /etc/profile.d/10-dev-path.sh
-
-# Everything in the bythewood-* volumes is owned by 1001 and Debian has no
-# default 1000 user, so an unpinned useradd takes 1000 and every volume mounts
-# owned by a stranger. Do not remove the -u.
-RUN useradd -m -u 1001 -G sudo -s /bin/bash dev && \
-    echo "dev ALL=(ALL) NOPASSWD: ALL" > /etc/sudoers.d/dev
-
-COPY dotfiles/bash_aliases /home/dev/.bash_aliases
-COPY dotfiles/gitconfig /home/dev/.gitconfig
 COPY dotfiles/neovim/init.lua /home/dev/.config/nvim/init.lua
 COPY dotfiles/tmux.conf /home/dev/.tmux.conf
 # The template ornith-ai's own GGUF carries, see scripts/pi.sh.
@@ -201,33 +252,14 @@ RUN git clone --quiet --depth 1 --branch v1.18.0 \
         /home/dev/.config/nvim/pack/dev/start/nvim-tree.lua && \
     rm -rf /home/dev/.config/nvim/pack/dev/start/nvim-tree.lua/.git
 
-# .claude.json lives in the volume so auth survives a rebuild.
-RUN mkdir -p /home/dev/code /home/dev/.claude /home/dev/.ssh /home/dev/.restic /models && \
+RUN mkdir -p /home/dev/.restic /models && \
     for f in /home/dev/scripts/*.sh; do mv "$f" "${f%.sh}"; done && \
     chmod +x /home/dev/scripts/* && \
-    echo "source ~/.bash_aliases" >> /home/dev/.bashrc && \
-    ln -s /home/dev/.claude/.claude.json /home/dev/.claude.json && \
-    ln -s code/memory/workspace.md /home/dev/CLAUDE.md && \
-    printf '%s\n' \
-    'Host *' \
-    '  IdentityFile ~/.ssh/home_key' \
-    '  IdentitiesOnly yes' \
-    '  StrictHostKeyChecking accept-new' \
-    '  UpdateHostKeys yes' \
-    '  HashKnownHosts yes' \
-    '  PasswordAuthentication no' \
-    '  ServerAliveInterval 60' \
-    '  ServerAliveCountMax 3' \
-    '  VisualHostKey yes' \
-    > /home/dev/.ssh/config && \
-    chmod 700 /home/dev/.ssh /home/dev/.restic && \
-    chmod 600 /home/dev/.ssh/config && \
+    chmod 700 /home/dev/.restic && \
     chown -R dev:dev /home/dev /models
 
 WORKDIR /home/dev
 USER dev
-
-RUN curl -fsSL https://claude.ai/install.sh | bash
 
 # pi walks up from its cwd to find this, and takes it over ~/CLAUDE.md.
 COPY --chown=dev:dev containers/webdev/AGENTS.md /home/dev/AGENTS.md

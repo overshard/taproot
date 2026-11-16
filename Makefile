@@ -303,12 +303,12 @@ SWAP = $(1) rm --force $(NAME)-old >/dev/null 2>&1; \
 #
 # Nothing below may contain $$(MAKE). GNU make runs any recipe line carrying
 # that string even under `-n`, so a dry run would really replace the container.
-# No cache for the webdev stage because the base is pinned by digest, so without
+# No cache for the claude and webdev stages because the base is pinned by digest, so without
 # it the apt layer is reused and Debian's security fixes never arrive. The llama
 # stage keeps its cache, it's a 15 minute CUDA build that only changes with
 # LLAMA_REF.
 update:
-	$(DOCKER) build --no-cache-filter webdev --tag $(IMAGE) -f containers/webdev/Dockerfile .
+	$(DOCKER) build --no-cache-filter claude,webdev --tag $(IMAGE) -f containers/webdev/Dockerfile .
 	@self=$$(cat /etc/hostname 2>/dev/null); \
 	target=$$($(DOCKER) inspect --format '{{.Config.Hostname}}' $(NAME) 2>/dev/null); \
 	if [ -z "$$target" ]; then \
