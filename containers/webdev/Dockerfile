@@ -189,7 +189,7 @@ USER dev
 RUN curl -fsSL https://claude.ai/install.sh | bash
 
 # Sessions are started from claude.ai or the app, so none is opened at boot.
-CMD ["claude", "remote-control", "--no-create-session-in-dir", "--permission-mode", "auto"]
+CMD ["claude", "remote-control", "--no-create-session-in-dir", "--permission-mode", "auto", "--capacity", "4"]
 
 
 # webdev, the desk. claude plus neovim, tmux, restic, the WireGuard peer, and pi
