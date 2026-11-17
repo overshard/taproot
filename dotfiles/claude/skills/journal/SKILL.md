@@ -1,6 +1,6 @@
 ---
 name: journal
-description: Wrap the current session into the git-versioned memory vault at code/memory. Invoke when Isaac says "journal" or "memory" as a standalone instruction (the signal the session is wrapping), or after any meaningful unit of work (a task/subtask wrapping, a decision, a commit or deploy, or a real discussion worth remembering, including non-engineering ones). Writes today's journal entry, updates the relevant notes and index, and commits.
+description: Wrap the current session into the git-versioned memory vault at code/memory. Invoke only when Isaac says "journal" or "memory" as a standalone instruction, or asks for something to be written down now. A background scribe records everything else, so don't invoke it after each unit of work. Writes the journal entry, updates the relevant notes and index, and commits.
 ---
 
 # Journal / memory wrap
@@ -10,10 +10,10 @@ is never skipped or done halfway.
 
 ## When to run
 
-- When Isaac says "journal" or "memory" on its own. The session is wrapping, so do the full
-  wrap right away from whatever context the session has.
-- After each meaningful unit of work, while it's fresh: a task wrapping, a decision, a commit
-  or deploy, or a real discussion on any topic. Don't batch the whole session into one entry.
+- When Isaac says "journal" or "memory" on its own, or asks for something to go in the vault
+  now. Do the full wrap right away from whatever context the session has.
+- Not otherwise. Hooks start a background scribe every eight messages, before a compaction and
+  at session end, so capturing inline as well only writes everything twice.
 
 ## The vault
 
