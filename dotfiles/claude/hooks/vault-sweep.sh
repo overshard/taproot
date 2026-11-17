@@ -21,11 +21,15 @@ mkdir -p "$STATE"
 exec 9>"$STATE/lock"
 flock -w 900 9 || exit 1
 
-changed=$(git -C "$VAULT" log --since=yesterday --name-only --format= -- projects topics decisions people | sort -u | tr '\n' ' ')
+# Only notes changed since the last tidy, so a run never redoes the one before.
+last=$(cat "$STATE/sweep-head" 2>/dev/null)
+range=${last:+$last..HEAD}
+changed=$(git -C "$VAULT" log ${range:---since=yesterday} --name-only --format= -- projects topics decisions people | sort -u | tr '\n' ' ')
 [ -n "$changed" ] || exit 0
 big=$(cd "$VAULT" && for f in projects/*.md topics/*.md decisions/*.md people/*.md; do
     w=$(wc -w < "$f")
     [ "$w" -gt "$MAX_WORDS" ] && echo "$f ($w words)"
 done | tr '\n' ' ')
 
-MAX_TURNS=60 "$here/vault-claude.sh" sweep "Nightly vault tidy in $VAULT, following $VAULT/CLAUDE.md and the Writing section of $VAULT/workspace.md. These notes changed in the last day: $changed. For each, read it alongside the last two days of journal and fix it so it reads as the current state: drop facts a later entry made false, fold duplicate lines together, and move Open items the journal has since closed out of the note's open threads. Never change what a journal file already says, only append to it. Check index.md and the section indexes it points to have a line for every note that changed and that each hook is still true. Notes over $MAX_WORDS words: ${big:-none}. Don't split them, add one line for each under Open in today's journal so Isaac can decide. Commit with git -C $VAULT add -A && git -C $VAULT commit -m \"memory: nightly tidy\". If nothing needs changing, change nothing."
+MAX_TURNS=60 "$here/vault-claude.sh" sweep "Nightly vault tidy in $VAULT, following $VAULT/CLAUDE.md and the Writing section of $VAULT/workspace.md. These notes changed since the last tidy: $changed. For each, read it alongside the last two days of journal and fix it so it reads as the current state: drop facts a later entry made false, fold duplicate lines together, and move Open items the journal has since closed out of the note's open threads. Never change what a journal file already says, only append to it. Check index.md and the section indexes it points to have a line for every note that changed and that each hook is still true. Notes over $MAX_WORDS words: ${big:-none}. Don't split them, add one line for each under Open in today's journal so Isaac can decide. Commit with git -C $VAULT add -A && git -C $VAULT commit -m \"memory: nightly tidy\". If nothing needs changing, change nothing." &&
+    git -C "$VAULT" rev-parse HEAD > "$STATE/sweep-head"

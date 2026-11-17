@@ -10,7 +10,7 @@ My notes vault at `~/code/memory` gets written by Claude without me asking. Hook
 | `vault-scribe.sh` | Hands a transcript's typed text since its last run to `vault-claude.sh` to write up |
 | `vault-capture.sh` | The Stop, PreCompact and SessionEnd hook that starts the scribe in the background |
 | `vault-digest.sh` | The SessionStart hook that puts the newest journal Open lines in front of Claude |
-| `vault-sweep.sh` | The nightly job, the scribe over the last two days and then a tidy of changed notes |
+| `vault-sweep.sh` | The nightly job, the scribe over the last two days and then a tidy of notes changed since the last one |
 
 Stop starts the scribe every 8 typed messages (`EVERY` in `vault-capture.sh`), and PreCompact and SessionEnd always start it. It runs detached with `setsid`, so the session never waits on it.
 
@@ -23,6 +23,7 @@ Everything lives in `~/.claude/state/`, which is in the restic backed `.claude` 
 - `vault-scribe/<session>` is how many transcript lines the scribe has written up for that session. Delete one to have the next run read the whole session again.
 - `vault-scribe/runs.log` has one line per run with the exit code, turns and token counts.
 - `vault-scribe/lock` is the flock that keeps two runs from committing at once.
+- `vault-scribe/sweep-head` is the vault commit the last tidy ended on.
 - `vault-capture/<session>` is the message count at the last Stop that started a scribe.
 
 ## The hooks in settings.json
