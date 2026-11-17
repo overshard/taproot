@@ -1,8 +1,9 @@
 # taproot
 
 Dotfiles, the container I write code in, and the configs that make a machine
-mine. The container also runs pi with a local coding model on the desktop's
-GPU. Nothing is deployed from here, every site I run lives in
+mine. That container is `claude` on my VPS now, Claude Code driven over remote
+control, and the older `webdev` one on the desktop also runs pi with a local
+coding model on its GPU. Nothing is deployed from here, every site I run lives in
 [orchard](https://github.com/overshard/orchard).
 
 ## Requirements
@@ -29,6 +30,16 @@ make models     # Ornith's weights for pi, once
 Debian's security fixes come in with it, and it works from inside the container it's replacing. Your shell drops for
 a couple of seconds and `docker exec -it bythewood-webdev tmux` brings you back.
 
+The VPS container has no make targets. From a clone, as root on the host:
+
+```sh
+docker compose -f containers/claude/compose.yml up -d --build
+docker exec -it claude claude    # once, then /login
+```
+
+Its backups run off the same restic scripts, with `restic-backup.timer` and
+`restic-check.timer` on the host exec'ing them into the container.
+
 From a dead machine back to running sites is [docs/recovery.md](docs/recovery.md).
 Backups and the helper scripts are in [docs/backups.md](docs/backups.md), the
 local model in [docs/pi.md](docs/pi.md), and the dotfiles and neovim
@@ -42,7 +53,8 @@ taproot/
 ├── docs/                the host, recovery, backups, pi, dotfiles
 ├── dotfiles/            bash, git, neovim, tmux, claude
 └── containers/
-    └── webdev/          Debian 13 dev image, scripts copied to ~/scripts/
+    ├── claude/          compose file for the VPS container
+    └── webdev/          the Dockerfile for both, scripts copied to ~/scripts/
 ```
 
 ## Things that will bite you
