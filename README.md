@@ -24,7 +24,9 @@ the container, since recreating it kills the shell doing it.
 
 Its backups are the restic scripts in `containers/claude/scripts/`, with
 `restic-backup.timer` and `restic-check.timer` on the host exec'ing them into the
-container, see [docs/backups.md](docs/backups.md).
+container, see [docs/backups.md](docs/backups.md). `vault-sweep.timer` on the host
+runs the nightly vault job the same way, and Claude Code's hooks write the vault
+in between, see [docs/vault.md](docs/vault.md).
 
 Every device I work from (the phone's terminal, WSL on the desktop and laptop)
 is the same thin client, set up by `client/setup.sh`. It gives it WireGuard,
@@ -36,7 +38,7 @@ disk after a reboot and `claude-vps` for Claude Code inside the container.
 ```
 taproot/
 ├── client/              setup for a device that works through the VPS
-├── docs/                recovery and backups
+├── docs/                recovery, backups and the vault hooks
 ├── dotfiles/            bash, git, claude
 └── containers/claude/   compose file, Dockerfile, scripts copied to ~/scripts/
 ```
