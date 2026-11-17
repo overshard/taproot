@@ -1,0 +1,4 @@
+#!/bin/sh
+# Unlocks the LUKS /srv after a reboot. Docker and everything behind it start
+# once it's mounted, so the sites and remote control come back on their own.
+ssh -t vps 'sudo systemctl start srv.mount && systemctl is-active docker'

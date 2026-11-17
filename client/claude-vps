@@ -1,0 +1,4 @@
+#!/bin/sh
+# Claude Code inside the VPS's claude container, for when remote control is
+# down or needs a fresh /login.
+exec ssh -t vps sudo docker exec -it -u dev -w /home/dev/code claude claude "$@"

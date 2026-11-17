@@ -40,6 +40,11 @@ docker exec -it claude claude    # once, then /login
 Its backups run off the same restic scripts, with `restic-backup.timer` and
 `restic-check.timer` on the host exec'ing them into the container.
 
+Every device I work from (the phone's terminal, WSL on the desktop and laptop)
+is the same thin client, set up by `client/setup.sh`. It gives it WireGuard,
+a `vps` ssh host, Claude Code, and two scripts: `unlock-vps` for the encrypted
+disk after a reboot and `claude-vps` for Claude Code inside the container.
+
 From a dead machine back to running sites is [docs/recovery.md](docs/recovery.md).
 Backups and the helper scripts are in [docs/backups.md](docs/backups.md), the
 local model in [docs/pi.md](docs/pi.md), and the dotfiles and neovim
@@ -50,6 +55,7 @@ keys in [docs/dotfiles.md](docs/dotfiles.md).
 ```
 taproot/
 ├── Makefile             every command
+├── client/              setup for a device that works through the VPS
 ├── docs/                the host, recovery, backups, pi, dotfiles
 ├── dotfiles/            bash, git, neovim, tmux, claude
 └── containers/
