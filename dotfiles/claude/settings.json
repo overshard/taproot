@@ -31,5 +31,52 @@
   "attribution": {
     "commit": "",
     "pr": ""
+  },
+  "hooks": {
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "$HOME/code/taproot/dotfiles/claude/hooks/vault-capture.sh",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "PreCompact": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "$HOME/code/taproot/dotfiles/claude/hooks/vault-capture.sh",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "SessionEnd": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "$HOME/code/taproot/dotfiles/claude/hooks/vault-capture.sh",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "SessionStart": [
+      {
+        "matcher": "startup|clear|compact",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "$HOME/code/taproot/dotfiles/claude/hooks/vault-digest.sh",
+            "timeout": 10
+          }
+        ]
+      }
+    ]
   }
 }
