@@ -1,8 +1,17 @@
 {
+  "theme": "dark",
   "autoMemoryEnabled": false,
   "hooks": {
     "SessionStart": [
-      {"hooks": [{"type": "command", "command": "$HOME/.local/bin/vault-pull", "timeout": 30}]}
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "$HOME/.local/bin/vault-pull",
+            "timeout": 30
+          }
+        ]
+      }
     ]
   }
 }

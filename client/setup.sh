@@ -43,6 +43,8 @@ mkdir -p ~/.ssh ~/.local/bin && chmod 700 ~/.ssh
 grep -q '^Host vps$' ~/.ssh/config 2>/dev/null || printf 'Host vps\n  HostName 10.77.0.1\n  User debian\n  IdentityFile ~/.ssh/id_ed25519\n  ServerAliveInterval 60\n' >> ~/.ssh/config
 chmod 600 ~/.ssh/config
 
+sudo timedatectl set-timezone America/New_York
+ln -sfn "$here/../dotfiles/gitconfig" ~/.gitconfig
 install -m 755 "$here/claude-vps" "$here/unlock-vps" "$here/vault-pull" ~/.local/bin/
 command -v claude >/dev/null || [ -x ~/.local/bin/claude ] || curl -fsSL https://claude.ai/install.sh | bash
 
