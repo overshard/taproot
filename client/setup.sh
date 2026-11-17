@@ -50,6 +50,8 @@ command -v claude >/dev/null || [ -x ~/.local/bin/claude ] || curl -fsSL https:/
 # the VPS reaches every device at its next pull.
 [ -e ~/CLAUDE.md ] && [ ! -L ~/CLAUDE.md ] && mv ~/CLAUDE.md ~/CLAUDE.md.before-client
 ln -sfn memory/client.md ~/CLAUDE.md
+[ -e ~/README.md ] && [ ! -L ~/README.md ] && mv ~/README.md ~/README.md.before-client
+ln -sfn "$here/README.md" ~/README.md
 mkdir -p ~/.claude
 if [ -f ~/.claude/settings.json ]; then
     jq -s '.[0] * .[1]' ~/.claude/settings.json "$here/claude-settings.json" > ~/.claude/settings.json.tmp
