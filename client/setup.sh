@@ -52,6 +52,7 @@ command -v claude >/dev/null || [ -x ~/.local/bin/claude ] || curl -fsSL https:/
 # the VPS reaches every device at its next pull.
 [ -e ~/CLAUDE.md ] && [ ! -L ~/CLAUDE.md ] && mv ~/CLAUDE.md ~/CLAUDE.md.before-client
 ln -sfn memory/client.md ~/CLAUDE.md
+ln -sfn memory/client.md ~/AGENTS.md
 [ -e ~/README.md ] && [ ! -L ~/README.md ] && mv ~/README.md ~/README.md.before-client
 ln -sfn "$here/README.md" ~/README.md
 mkdir -p ~/.claude

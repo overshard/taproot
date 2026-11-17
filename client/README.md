@@ -34,7 +34,8 @@ sudo docker exec -it -u dev claude bash
 - `ssh vps` uses this device's own key, `~/.ssh/id_ed25519`.
 - `~/memory` is a read-only copy of the vault, pulled whenever Claude starts
   here. Only the VPS writes to it.
-- `~/CLAUDE.md` tells Claude on this device the same things.
+- `~/CLAUDE.md` tells Claude on this device the same things, and `~/AGENTS.md`
+  tells pi or any other agent.
 - `~/taproot/client/setup.sh` set all of this up, and running it again is safe.
 
 ## If something's off
