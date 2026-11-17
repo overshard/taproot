@@ -53,6 +53,8 @@ taproot/
   and on the paper in the safe.
 - The `dev` user is UID 1001 to match the volumes, so don't clean up the
   `-u 1001`.
+- The gitleaks pre-commit hook is off in a fresh clone. Turn it on with
+  `git config core.hooksPath .githooks`, which needs `apt install gitleaks`.
 
 ## License
 

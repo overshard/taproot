@@ -34,7 +34,7 @@ RUN apt-get update && \
         > /etc/apt/sources.list.d/docker.sources && \
     apt-get update && \
     apt-get install -y --no-install-recommends \
-        git rsync openssh-client restic \
+        git rsync openssh-client restic gitleaks \
         unzip xz-utils tree sudo jq sqlite3 poppler-utils \
         build-essential tzdata python3 procps ripgrep fd-find \
         dnsutils iputils-ping iproute2 netcat-openbsd traceroute mtr-tiny whois \
