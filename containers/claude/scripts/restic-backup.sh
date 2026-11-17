@@ -7,14 +7,13 @@
 # initializes the repo on first run and prunes to 7 daily, 4 weekly and 6
 # monthly after each successful backup.
 #
-# Snapshots are tagged with --host so desktop, laptop and vps stay distinct in the
-# shared repo, and retention applies per host and paths, so each machine keeps
-# its own window.
+# Snapshots are tagged with --host, which is vps, and retention applies per host,
+# so the desktop's old farewell snapshot keeps its own window and isn't pruned.
 #
 # Built code is not backed up. The bare-name excludes match a directory of that
-# name at any depth, and cargo's target/ dirs go by --exclude-caches instead,
-# since cargo writes a CACHEDIR.TAG into each one. orchard/bin is excluded by
-# full path because a bare 'bin' would also drop src/bin trees, which are source.
+# name at any depth, and anything with a CACHEDIR.TAG goes by --exclude-caches.
+# orchard/bin is excluded by full path because a bare 'bin' would also drop
+# src/bin trees, which are source.
 # A directory holding a .nobackup file is skipped, for data that stays local.
 # Claude Code's background jobs keep scratch under jobs/*/tmp, which has held
 # gigabytes of core dumps and copied databases.
