@@ -1,0 +1,11 @@
+#!/bin/sh
+# Brings the read-only vault mirror up to date from the VPS, cloning it the
+# first time. Quiet and on a short timeout, so a client that can't reach the
+# VPS keeps working from its last copy. vault-upload-pack on the VPS only
+# serves fetches, so this mirror can never push.
+if [ -d "$HOME/memory/.git" ]; then
+    timeout 20 git -C "$HOME/memory" pull -q --ff-only >/dev/null 2>&1
+else
+    timeout 60 git clone -q --upload-pack=vault-upload-pack vps:memory "$HOME/memory" >/dev/null 2>&1
+fi
+exit 0
