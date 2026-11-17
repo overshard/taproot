@@ -9,7 +9,7 @@
 #
 #   client/setup.sh <this device's wg address> <vps endpoint ip> <vps wg public key>
 #   client/setup.sh 10.77.0.4 203.0.113.10 abc...=
-#   client/setup.sh             where something else runs the tunnel, like a phone
+#   client/setup.sh             when /etc/wireguard/wg0.conf is already in place
 #
 # It prints this device's public keys at the end, and they go on the VPS
 # before ssh will work. Safe to run again, nothing that exists is overwritten.
@@ -36,7 +36,7 @@ if [ -n "$addr" ] && ! sudo test -f /etc/wireguard/wg0.conf; then
         "$addr" "$priv" "$vpskey" "$endpoint" | sudo tee /etc/wireguard/wg0.conf >/dev/null
     sudo chmod 600 /etc/wireguard/wg0.conf
 fi
-[ -n "$addr" ] && sudo systemctl enable --now wg-quick@wg0
+sudo test -f /etc/wireguard/wg0.conf && sudo systemctl enable --now wg-quick@wg0
 
 mkdir -p ~/.ssh ~/.local/bin && chmod 700 ~/.ssh
 [ -f ~/.ssh/id_ed25519 ] || ssh-keygen -q -t ed25519 -N '' -f ~/.ssh/id_ed25519 -C "$(hostname)"
