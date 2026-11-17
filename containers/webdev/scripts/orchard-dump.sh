@@ -38,7 +38,7 @@ fi
 # The script goes in on stdin, since a bind mount from this container would
 # name a path on the host and not in here.
 # shellcheck disable=SC2086
-sudo docker run --rm -i -u 0 --network none $mounts -v "$OUT_VOLUME:/out" \
+sudo docker run --rm -i --pull=never -u 0 --network none $mounts -v "$OUT_VOLUME:/out" \
     "$IMAGE" sh -s $names <<'DUMP'
 set -eu
 for v in "$@"; do
