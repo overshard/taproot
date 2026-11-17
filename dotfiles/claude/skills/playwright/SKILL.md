@@ -10,14 +10,13 @@ Playwright MCP server. The MCP streams the full accessibility tree and screensho
 into context on every step (~4x the tokens). The CLI writes that state to disk and lets
 you read only the snapshot lines you need. Same browser, far cheaper context.
 
-The webdev container already ships Playwright Chromium at `/opt/playwright-browsers`
+The claude container already ships Playwright Chromium at `/opt/playwright-browsers`
 (symlinked to `/opt/google/chrome/chrome`), so no extra browser download is needed.
 
 ## Setup
 
-The webdev Dockerfile installs `@playwright/cli` with bun, pinned by version, so it's
-already on PATH. If `playwright-cli --version` fails the image is old, and `make update`
-in taproot fixes it.
+The claude Dockerfile installs `@playwright/cli` with bun, pinned by version, so it's
+already on PATH. If `playwright-cli --version` fails the image is old and wants a rebuild.
 
 ## Core workflow
 

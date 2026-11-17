@@ -1,6 +1,6 @@
 # Claude Code config
 
-Version-controlled Claude Code config for the webdev machine: skills, the status line,
+Version-controlled Claude Code config for the claude container: skills, the status line,
 and shareable global settings. Lives in taproot (a **public** repo), symlinked into the
 untracked `~/.claude/` volume so edits here are live immediately and survive container
 rebuilds.
@@ -42,7 +42,8 @@ these symlinks already survive rebuilds. Only a brand-new volume needs this one-
 wiring, after `~/code/taproot` is cloned:
 
 ```bash
-ln -snf ~/code/taproot/dotfiles/claude/skills         ~/.claude/skills
+mkdir -p ~/.claude/skills
+for s in journal playwright roundup; do ln -snf ~/code/taproot/dotfiles/claude/skills/$s ~/.claude/skills/$s; done
 ln -snf ~/code/taproot/dotfiles/claude/status-line.sh ~/.claude/status-line.sh
 # settings.json is machine-local, so copy the template instead of symlinking:
 cp ~/code/taproot/dotfiles/claude/settings.json ~/.claude/settings.json   # then re-add machine-local bits

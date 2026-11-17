@@ -1,0 +1,151 @@
+# claude
+#
+# The VPS's Claude Code container, run by compose.yml beside this file. Debian 13
+# with Go, Python (uv), Bun, the Docker CLI, gh, typst and Playwright, and no
+# nodejs, npm or Rust. Work lives in the volumes, so the container itself is
+# disposable.
+#
+# Gotchas: docker.sock is root-owned 660, so docker needs sudo in here. Bind
+# mounts under /home/dev silently mount empty, because the daemon resolves paths
+# on the host, so use named volumes.
+
+FROM debian:trixie-slim@sha256:62bd423aeee912639ca8ee681c2b762cb3e25137e0a92b20be455898a9f034ad
+
+# BUN_INSTALL is persistent: it also decides where `bun install -g` puts globals.
+ENV DEBIAN_FRONTEND=noninteractive \
+    TZ=UTC \
+    BUN_INSTALL=/usr/local \
+    LANG=C.UTF-8 \
+    LC_ALL=C.UTF-8 \
+    TERM=xterm-256color \
+    PATH="/home/dev/.local/bin:/home/dev/scripts:/usr/local/go/bin:/home/dev/go/bin:$PATH"
+
+# Docker's repo, not Debian's, since trixie has no docker-compose-v2 package.
+# Client only, never the daemon. jq is required by code-sync, and there is no
+# pip or python3-venv because uv covers both. The upgrade is what brings in
+# Debian's security fixes, since the base above is pinned by digest.
+RUN apt-get update && \
+    apt-get upgrade -y && \
+    apt-get install -y --no-install-recommends ca-certificates curl && \
+    install -m 0755 -d /etc/apt/keyrings && \
+    curl -fsSL https://download.docker.com/linux/debian/gpg -o /etc/apt/keyrings/docker.asc && \
+    chmod a+r /etc/apt/keyrings/docker.asc && \
+    printf 'Types: deb\nURIs: https://download.docker.com/linux/debian\nSuites: trixie\nComponents: stable\nArchitectures: amd64\nSigned-By: /etc/apt/keyrings/docker.asc\n' \
+        > /etc/apt/sources.list.d/docker.sources && \
+    apt-get update && \
+    apt-get install -y --no-install-recommends \
+        git rsync openssh-client restic \
+        unzip xz-utils tree sudo jq sqlite3 poppler-utils \
+        build-essential tzdata python3 procps ripgrep fd-find \
+        dnsutils iputils-ping iproute2 netcat-openbsd traceroute mtr-tiny whois \
+        docker-ce-cli docker-compose-plugin docker-buildx-plugin && \
+    rm -rf /var/lib/apt/lists/*
+
+RUN curl -fsSL https://astral.sh/uv/install.sh | env UV_INSTALL_DIR=/usr/local/bin sh && \
+    curl -fsSL https://bun.sh/install | bash
+
+# npm-published CLIs have a `#!/usr/bin/env node` shebang and die without this
+# shim. `node --version` does not work under it, hence the real script.
+RUN ln -sf /usr/local/bin/bun /usr/local/bin/node && \
+    echo 'console.log("node shim ok")' > /tmp/shim.js && \
+    node /tmp/shim.js && rm /tmp/shim.js
+
+# Upstream tarball, not apt, which lags releases.
+ARG GO_VERSION=1.27.4
+ARG GO_SHA256=7226736c2339719cda28fbf3a54d71aa63bcefe376e98cef00034268dab24840
+RUN curl -fsSLO "https://go.dev/dl/go${GO_VERSION}.linux-amd64.tar.gz" && \
+    echo "${GO_SHA256}  go${GO_VERSION}.linux-amd64.tar.gz" | sha256sum -c - && \
+    tar -C /usr/local -xzf "go${GO_VERSION}.linux-amd64.tar.gz" && \
+    rm "go${GO_VERSION}.linux-amd64.tar.gz" && \
+    go version
+
+# Pinned to the version orchard's sites use. musl is the only linux x86_64 build
+# typst ships, and it is static so it runs fine on glibc.
+ARG TYPST_VERSION=0.14.0
+ARG TYPST_SHA256=99816d2982de08d2b091bac56b59b2faa523a10e1378ad3cdd68e35b8eb74b3d
+RUN curl -fsSL -o /tmp/typst.tar.xz \
+      "https://github.com/typst/typst/releases/download/v${TYPST_VERSION}/typst-x86_64-unknown-linux-musl.tar.xz" && \
+    echo "${TYPST_SHA256}  /tmp/typst.tar.xz" | sha256sum -c - && \
+    tar -xJf /tmp/typst.tar.xz -C /tmp && \
+    mv /tmp/typst-x86_64-unknown-linux-musl/typst /usr/local/bin/typst && \
+    rm -rf /tmp/typst.tar.xz /tmp/typst-x86_64-unknown-linux-musl && \
+    typst --version
+
+# Debian does not package gh, and GitHub's apt repo would be a second keyring
+# for one binary.
+ARG GH_VERSION=2.103.3
+ARG GH_SHA256=4c806978ffce1cec70853302a56d70ac6da4f19bae7adca4e1a8ab00633dd91d
+RUN curl -fsSL -o /tmp/gh.tar.gz \
+      "https://github.com/cli/cli/releases/download/v${GH_VERSION}/gh_${GH_VERSION}_linux_amd64.tar.gz" && \
+    echo "${GH_SHA256}  /tmp/gh.tar.gz" | sha256sum -c - && \
+    tar -xzf /tmp/gh.tar.gz -C /tmp && \
+    mv "/tmp/gh_${GH_VERSION}_linux_amd64/bin/gh" /usr/local/bin/gh && \
+    rm -rf /tmp/gh.tar.gz "/tmp/gh_${GH_VERSION}_linux_amd64" && \
+    gh --version
+
+RUN ln -snf /usr/share/zoneinfo/UTC /etc/localtime && echo "UTC" > /etc/timezone
+
+# The pin matters. 0.1.14 drives a page, while 0.1.18 and unpinned both die with
+# "No usable sandbox" under Docker on WSL2, so drive a real page after
+# any bump. Some tools want Chrome at the /opt path, hence the symlink.
+ARG PLAYWRIGHT_CLI_VERSION=0.1.14
+ENV PLAYWRIGHT_BROWSERS_PATH=/opt/playwright-browsers
+RUN bun install -g @playwright/cli@${PLAYWRIGHT_CLI_VERSION} && \
+    playwright-cli --help >/dev/null && \
+    CORE="$(find /usr/local/install/global -path '*/playwright-core/cli.js' | head -1)" && \
+    test -n "$CORE" && \
+    node "$CORE" install --with-deps chromium && \
+    chmod -R a+rx /opt/playwright-browsers && \
+    mkdir -p /opt/google/chrome && \
+    ln -snf /opt/playwright-browsers/chromium-*/chrome-linux64/chrome /opt/google/chrome/chrome && \
+    test -x /opt/google/chrome/chrome && \
+    rm -rf /var/lib/apt/lists/*
+
+# Debian's /etc/profile assigns PATH outright, so a login shell drops everything
+# the ENV added. The ENV still covers plain `docker exec`.
+RUN printf '%s\n' \
+    'export PATH="/home/dev/.local/bin:/home/dev/scripts:/usr/local/go/bin:/home/dev/go/bin:$PATH"' \
+    > /etc/profile.d/10-dev-path.sh && chmod 644 /etc/profile.d/10-dev-path.sh
+
+# Everything in the volumes is owned by 1001 and Debian has no
+# default 1000 user, so an unpinned useradd takes 1000 and every volume mounts
+# owned by a stranger. Do not remove the -u.
+RUN useradd -m -u 1001 -G sudo -s /bin/bash dev && \
+    echo "dev ALL=(ALL) NOPASSWD: ALL" > /etc/sudoers.d/dev
+
+COPY dotfiles/bash_aliases /home/dev/.bash_aliases
+COPY dotfiles/gitconfig /home/dev/.gitconfig
+
+COPY containers/claude/scripts/ /home/dev/scripts/
+
+# .claude.json lives in the volume so auth survives a rebuild.
+RUN mkdir -p /home/dev/code /home/dev/.claude /home/dev/.ssh /home/dev/.restic && \
+    for f in /home/dev/scripts/*.sh; do mv "$f" "${f%.sh}"; done && \
+    chmod +x /home/dev/scripts/* && \
+    chmod 700 /home/dev/.restic && \
+    echo "source ~/.bash_aliases" >> /home/dev/.bashrc && \
+    ln -s /home/dev/.claude/.claude.json /home/dev/.claude.json && \
+    ln -s code/memory/workspace.md /home/dev/CLAUDE.md && \
+    printf '%s\n' \
+    'Host *' \
+    '  IdentityFile ~/.ssh/home_key' \
+    '  IdentitiesOnly yes' \
+    '  StrictHostKeyChecking accept-new' \
+    '  UpdateHostKeys yes' \
+    '  HashKnownHosts yes' \
+    '  PasswordAuthentication no' \
+    '  ServerAliveInterval 60' \
+    '  ServerAliveCountMax 3' \
+    '  VisualHostKey yes' \
+    > /home/dev/.ssh/config && \
+    chmod 700 /home/dev/.ssh && \
+    chmod 600 /home/dev/.ssh/config && \
+    chown -R dev:dev /home/dev
+
+WORKDIR /home/dev
+USER dev
+
+RUN curl -fsSL https://claude.ai/install.sh | bash
+
+# Sessions are started from claude.ai or the app, so none is opened at boot.
+CMD ["claude", "remote-control", "--no-create-session-in-dir", "--permission-mode", "auto", "--capacity", "4"]

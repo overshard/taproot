@@ -1,5 +1,5 @@
 # The VPS's Claude Code, driven from claude.ai or the app over remote control.
-# Built from the claude stage of webdev's Dockerfile. From a clone of this repo:
+# From a clone of this repo:
 #
 #     sudo docker compose -f containers/claude/compose.yml up -d --build
 #
@@ -9,8 +9,7 @@ services:
   claude:
     build:
       context: ../..
-      dockerfile: containers/webdev/Dockerfile
-      target: claude
+      dockerfile: containers/claude/Dockerfile
     image: overshard/claude:latest
     container_name: claude
     hostname: vps

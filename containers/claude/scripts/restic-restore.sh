@@ -48,7 +48,7 @@ for dir in .claude code .ssh; do
 done
 
 echo "Restoring latest snapshot from $RESTIC_REPOSITORY"
-# desktop and laptop share this repo, so a bare `latest` would restore
+# Every machine shares this repo, so a bare `latest` would restore
 # whichever machine backed up most recently.
 restic restore latest --host="$RESTIC_HOST" --target /
 

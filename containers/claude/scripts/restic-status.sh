@@ -5,7 +5,7 @@
 # Show backup health for the webdev restic repo: the latest snapshot for each
 # machine that backs up to it, and what it costs in B2.
 #
-# --age prints how old this machine's last snapshot is, for make doctor, and
+# --age prints how old this machine's last snapshot is, and
 # exits 1 past two days.
 #
 # Files used:

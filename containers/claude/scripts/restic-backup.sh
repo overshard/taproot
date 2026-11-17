@@ -3,7 +3,7 @@
 # restic-backup.sh
 #
 # Backs up this container to Backblaze B2 via restic. The host's
-# restic-backup.timer runs it nightly and make backup runs it by hand. It
+# restic-backup.timer runs it nightly through docker exec. It
 # initializes the repo on first run and prunes to 7 daily, 4 weekly and 6
 # monthly after each successful backup.
 #
@@ -22,7 +22,7 @@
 # On the VPS ~/orchard-backup is a volume, and orchard-dump fills it with a
 # consistent copy of orchard's volumes first, so those go to B2 as well.
 #
-# Credentials live in ~/.restic/, mounted from the bythewood-restic volume, and
+# Credentials live in ~/.restic/, mounted from the claude-restic volume, and
 # restic-setup is what writes them:
 #   ~/.restic/password   restic repo password (0600)
 #   ~/.restic/b2-env     exports B2_ACCOUNT_ID, B2_ACCOUNT_KEY, RESTIC_HOST (0600)
@@ -36,7 +36,7 @@ export RESTIC_PASSWORD_FILE="$HOME/.restic/password"
 
 if [ -z "${RESTIC_HOST:-}" ]; then
     echo "ERROR: RESTIC_HOST is not set." >&2
-    echo "Add 'export RESTIC_HOST=desktop' (or laptop) to ~/.restic/b2-env" >&2
+    echo "Add 'export RESTIC_HOST=vps' to ~/.restic/b2-env" >&2
     exit 1
 fi
 

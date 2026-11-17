@@ -11,13 +11,12 @@
 #   restic-setup --check     check only and quietly, exit 0 if backups will work
 #   restic-setup --password  print a suggested password and exit, writing nothing
 #
-# The files it manages, all in the bythewood-restic volume:
+# The files it manages, all in the claude-restic volume:
 #
 #   ~/.restic/b2-env           B2_ACCOUNT_ID, B2_ACCOUNT_KEY, RESTIC_HOST
 #   ~/.restic/password         password for the webdev repo
 #
-# From a taproot clone this is `make restic`, and --check is what `make doctor`
-# calls, so keep it silent and keep its exit code meaningful.
+# --check is for scripts, so keep it silent and keep its exit code meaningful.
 
 set -eu
 
@@ -77,8 +76,8 @@ have_all_fields() {
 
 # Opening the repository is the only check that proves anything, since a wrong
 # key, a wrong password and no network all land here. Timed out because restic
-# retries a failing backend about ten times with backoff and `make doctor`
-# calls this. 124 is the timeout's own exit code.
+# retries a failing backend about ten times with backoff and --check
+# shouldn't hang. 124 is the timeout's own exit code.
 RESTIC_TIMEOUT=${RESTIC_TIMEOUT:-30}
 restic_probe() {
     B2_ACCOUNT_ID="$B2_ID" B2_ACCOUNT_KEY="$B2_KEY" \
@@ -120,8 +119,8 @@ if have_all_fields; then
         echo ""
         echo "backups are working. nothing to do here."
         echo ""
-        echo "  make backup      take a snapshot from this machine"
-        echo "  make snapshots   last snapshot per host, and what the repo costs"
+        echo "  restic-backup    take a snapshot from this machine"
+        echo "  restic-status    last snapshot per host, and what the repo costs"
         exit 0
     fi
     echo "FAILED"
@@ -138,7 +137,7 @@ echo ""
 if [ ! -t 0 ]; then
     echo "this needs a terminal to read the values. run it as:" >&2
     echo "" >&2
-    echo "  make restic" >&2
+    echo "  sudo docker exec -it claude restic-setup" >&2
     exit 1
 fi
 
@@ -157,7 +156,7 @@ where these come from
        Restic does its own encryption, and object lock would break prune.
 
     2. Application Keys, then "Add a New Application Key".
-         name         anything, e.g. webdev-desktop
+         name         anything, e.g. claude-vps
          bucket       overshard-backups, not "All"
          access       Read and Write
          leave the file-name prefix and duration empty
@@ -290,9 +289,9 @@ if repo_opens; then
     echo ""
     echo "backups are set up. next:"
     echo ""
-    echo "  make backup      take a snapshot from this machine"
-    echo "  make restore     pull everything back, on a fresh container"
-    echo "  make snapshots   last snapshot per host, and what the repo costs"
+    echo "  restic-backup    take a snapshot from this machine"
+    echo "  restic-restore   pull everything back, on a fresh container"
+    echo "  restic-status    last snapshot per host, and what the repo costs"
     exit 0
 fi
 
