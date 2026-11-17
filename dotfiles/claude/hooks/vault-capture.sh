@@ -2,35 +2,29 @@
 #
 # vault-capture.sh
 #
-# A Stop hook for the VPS. When a session has had a few exchanges since the
-# vault last got a commit, it holds the stop once and asks Claude to write them
-# down, so the vault keeps up without anyone saying "journal". Quiet turns pass.
-#
-# VAULT is the repo to watch and EVERY is how many user messages may go
-# unrecorded before it asks.
+# Hooked to Stop, PreCompact and SessionEnd on the VPS. Stop starts the scribe
+# once a session has had EVERY typed messages since it last did, and the other
+# two always start it. The scribe runs detached so the session never waits.
 
-VAULT=${VAULT:-$HOME/code/memory}
-EVERY=${EVERY:-3}
+EVERY=${EVERY:-8}
 STATE=$HOME/.claude/state/vault-capture
+SCRIBE=$(dirname "$0")/vault-scribe.sh
 
 input=$(cat)
-[ "$(printf '%s' "$input" | jq -r '.stop_hook_active // false')" = true ] && exit 0
+event=$(printf '%s' "$input" | jq -r '.hook_event_name // empty')
 session=$(printf '%s' "$input" | jq -r '.session_id // empty')
 transcript=$(printf '%s' "$input" | jq -r '.transcript_path // empty')
 [ -n "$session" ] && [ -r "$transcript" ] || exit 0
 
-# Typed user messages only, since tool results also arrive as type user.
-said=$(jq -c 'select(.type == "user" and (.message.content | type) == "string")' "$transcript" 2>/dev/null | wc -l)
-head=$(git -C "$VAULT" rev-parse HEAD 2>/dev/null) || exit 0
-
-mkdir -p "$STATE"
-mark="$STATE/$session"
-read -r last_said last_head 2>/dev/null < "$mark" || { last_said=0; last_head=$head; }
-
-if [ "$head" != "$last_head" ] || [ $((said - last_said)) -lt "$EVERY" ]; then
-    [ "$head" != "$last_head" ] && echo "$said $head" > "$mark"
-    exit 0
+if [ "$event" = Stop ]; then
+    # Typed user messages only, since tool results also arrive as type user.
+    said=$(jq -c 'select(.type == "user" and (.message.content | type) == "string")' "$transcript" 2>/dev/null | wc -l)
+    mkdir -p "$STATE"
+    mark="$STATE/$session"
+    last=$(cat "$mark" 2>/dev/null || echo 0)
+    [ $((said - last)) -ge "$EVERY" ] || exit 0
+    echo "$said" > "$mark"
 fi
-echo "$said $head" > "$mark"
 
-jq -n '{decision: "block", reason: "Before stopping, capture what this session has talked about and done since the vault was last committed, following the vault contract in ~/code/memory/CLAUDE.md: the journal entry, any note it changes or creates, and the index, then commit. Personal and non-engineering talk counts. If there is truly nothing new, stop without writing anything."}'
+setsid -f "$SCRIBE" "$transcript" < /dev/null > /dev/null 2>&1
+exit 0
