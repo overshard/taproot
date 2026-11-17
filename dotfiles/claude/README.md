@@ -33,7 +33,6 @@ Plain skill dirs, each `skills/<name>/SKILL.md` with YAML frontmatter (`name`,
 - **journal** wrap the session into the `~/code/memory` vault (the memory contract).
 - **playwright** browser automation via `playwright-cli` (token-efficient, replaces the
   Playwright MCP).
-- **roundup** a news and markets catch up, diffed against the last one saved in the vault.
 
 ## Setup on a fresh machine
 
@@ -43,7 +42,7 @@ wiring, after `~/code/taproot` is cloned:
 
 ```bash
 mkdir -p ~/.claude/skills
-for s in journal playwright roundup; do ln -snf ~/code/taproot/dotfiles/claude/skills/$s ~/.claude/skills/$s; done
+for s in journal playwright; do ln -snf ~/code/taproot/dotfiles/claude/skills/$s ~/.claude/skills/$s; done
 ln -snf ~/code/taproot/dotfiles/claude/status-line.sh ~/.claude/status-line.sh
 # settings.json is machine-local, so copy the template instead of symlinking:
 cp ~/code/taproot/dotfiles/claude/settings.json ~/.claude/settings.json   # then re-add machine-local bits
