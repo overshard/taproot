@@ -40,9 +40,17 @@ if [ -z "${RESTIC_HOST:-}" ]; then
     exit 1
 fi
 
-if ! restic cat config >/dev/null 2>&1; then
+# restic retries a capped or refused B2 request quietly instead of failing, so
+# every call gets a timeout and the host unit fails and alerts instead of hanging.
+# Exit 10 is restic's "repository does not exist", the only case that inits.
+config_exit=0
+timeout 10m restic cat config >/dev/null 2>&1 || config_exit=$?
+if [ "$config_exit" -eq 10 ]; then
     echo "Repository not initialized. Running restic init..."
     restic init
+elif [ "$config_exit" -ne 0 ]; then
+    echo "ERROR: could not read the repo config (exit $config_exit), is B2 reachable?" >&2
+    exit "$config_exit"
 fi
 
 dump_exit=0
@@ -55,7 +63,7 @@ fi
 # Exit codes are captured rather than left to set -e, since a partial backup
 # (restic exit 3) still produced a snapshot the prune has to run against.
 backup_exit=0
-restic backup \
+timeout 3h restic backup \
     --verbose \
     --host="$RESTIC_HOST" \
     --exclude-caches \
@@ -78,7 +86,7 @@ restic backup \
     "$HOME/.ssh" $orchard || backup_exit=$?
 
 prune_exit=0
-restic forget --prune \
+timeout 1h restic forget --prune \
     --host="$RESTIC_HOST" \
     --keep-daily   7 \
     --keep-weekly  4 \

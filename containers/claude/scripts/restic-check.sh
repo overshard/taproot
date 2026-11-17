@@ -13,4 +13,5 @@ set -eu
 export RESTIC_REPOSITORY="b2:overshard-backups:webdev"
 export RESTIC_PASSWORD_FILE="$HOME/.restic/password"
 
-restic check --read-data-subset=5%
+# restic retries a capped B2 download forever, so the timeout makes it fail and alert.
+timeout 2h restic check --read-data-subset=5%
