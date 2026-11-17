@@ -2,27 +2,30 @@
 #
 # vault-sweep.sh
 #
-# The nightly backstop to vault-capture. The VPS host's vault-sweep.timer runs
-# it in the claude container, and it hands Claude a plain text copy of every
-# session touched in the last day and asks it to record whatever the vault is
-# still missing.
-
-set -eu
+# The nightly vault job, run by vault-sweep.timer on the VPS host through
+# docker exec. First it runs the scribe over every session from the last two
+# days, which only reads what no earlier scribe run has, then it has Claude
+# tidy up the notes that changed in the last day.
 
 VAULT=${VAULT:-$HOME/code/memory}
-out=$(mktemp -d)
-trap 'rm -rf "$out"' EXIT
+STATE=$HOME/.claude/state/vault-scribe
+MAX_WORDS=${MAX_WORDS:-8000}
+here=$(dirname "$0")
+export TZ=${TZ:-America/New_York}
 
-# User and assistant text only, since tool output is most of a transcript and
-# none of it is what was said.
-find "$HOME/.claude/projects" -name '*.jsonl' -mtime -1 | while read -r f; do
-    jq -r 'select(.type == "user" or .type == "assistant")
-        | (.message.content | if type == "string" then . else map(select(.type == "text") | .text) | join("\n") end) as $t
-        | select($t != "") | "\(.type): \($t)"' "$f" 2>/dev/null > "$out/$(basename "$f" .jsonl).txt" || true
+find "$HOME/.claude/projects" -maxdepth 2 -name '*.jsonl' -mtime -2 | while read -r f; do
+    "$here/vault-scribe.sh" "$f"
 done
-find "$out" -empty -delete
-[ -n "$(ls "$out")" ] || exit 0
 
-cd "$VAULT"
-claude -p --permission-mode auto --add-dir "$out" \
-"Nightly vault sweep. $out holds a text copy of every Claude session from the last day. Read them, compare with the vault (today's and yesterday's journal and the notes they touch), and record anything said or done that the vault doesn't have yet, following ~/code/memory/CLAUDE.md, then commit. Personal and non-engineering talk counts. Don't rewrite what's already there. If nothing is missing, change nothing."
+mkdir -p "$STATE"
+exec 9>"$STATE/lock"
+flock -w 900 9 || exit 1
+
+changed=$(git -C "$VAULT" log --since=yesterday --name-only --format= -- projects topics decisions people | sort -u | tr '\n' ' ')
+[ -n "$changed" ] || exit 0
+big=$(cd "$VAULT" && for f in projects/*.md topics/*.md decisions/*.md people/*.md; do
+    w=$(wc -w < "$f")
+    [ "$w" -gt "$MAX_WORDS" ] && echo "$f ($w words)"
+done | tr '\n' ' ')
+
+MAX_TURNS=60 "$here/vault-claude.sh" sweep "Nightly vault tidy in $VAULT, following $VAULT/CLAUDE.md and the Writing section of $VAULT/workspace.md. These notes changed in the last day: $changed. For each, read it alongside the last two days of journal and fix it so it reads as the current state: drop facts a later entry made false, fold duplicate lines together, and move Open items the journal has since closed out of the note's open threads. Never change what a journal file already says, only append to it. Check index.md and the section indexes it points to have a line for every note that changed and that each hook is still true. Notes over $MAX_WORDS words: ${big:-none}. Don't split them, add one line for each under Open in today's journal so Isaac can decide. Commit with git -C $VAULT add -A && git -C $VAULT commit -m \"memory: nightly tidy\". If nothing needs changing, change nothing."
