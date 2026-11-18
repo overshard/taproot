@@ -2,22 +2,29 @@
 #
 # vault-digest.sh
 #
-# A SessionStart hook for the VPS. Puts the newest Open lines from the vault's
-# journal in front of Claude so a new session knows what's in flight without
-# reading the whole index first.
+# A SessionStart hook for the VPS. Puts the vault's open.md and the newest
+# journal headings in front of Claude so a new session knows what's in flight
+# and what was just done without reading the whole index first.
 
 VAULT=${VAULT:-$HOME/code/memory}
-LINES=${LINES:-25}
+HEADINGS=${HEADINGS:-15}
+
+open=$(sed '1,/^## /{/^## /!d}' "$VAULT/open.md" 2>/dev/null)
 
 latest=$(ls "$VAULT"/journal/2*.md 2>/dev/null | tail -n 2)
-[ -n "$latest" ] || exit 0
+recent=$(for f in $latest; do
+    day=$(basename "$f" .md)
+    grep '^## ' "$f" | sed "s/^## /- $day /"
+done | tail -n "$HEADINGS")
 
-open=$(awk '
-    /^## /         { title = substr($0, 4) }
-    /^\*\*Open\*\*/ { inopen = 1; next }
-    /^\*\*|^## /   { inopen = 0 }
-    inopen && /^- / { print "- (" title ") " substr($0, 3) }
-' $latest | tail -n "$LINES")
-[ -n "$open" ] || exit 0
+[ -n "$open$recent" ] || exit 0
 
-jq -n --arg open "$open" '{hookSpecificOutput: {hookEventName: "SessionStart", additionalContext: ("Newest Open lines from the vault journal, for context only. index.md and the notes have the rest.\n" + $open)}}'
+text="From the vault. open.md is the only list of what's outstanding, and journal Open lines are history that never gets closed, so check open.md and the later journal entries before calling anything open.
+
+open.md:
+$open
+
+Newest journal entries:
+$recent"
+
+jq -n --arg t "$text" '{hookSpecificOutput: {hookEventName: "SessionStart", additionalContext: $t}}'
