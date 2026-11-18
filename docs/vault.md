@@ -62,7 +62,7 @@ ExecStart=/usr/bin/docker exec -u dev claude /home/dev/code/taproot/dotfiles/cla
 Description=nightly vault sweep
 
 [Timer]
-OnCalendar=*-*-* 05:00 UTC
+OnCalendar=*-*-* 00:00 America/New_York
 Persistent=true
 
 [Install]
