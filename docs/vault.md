@@ -73,6 +73,6 @@ After writing them, `sudo systemctl daemon-reload && sudo systemctl enable --now
 
 ## Things that will bite you
 
-- The container sets no `TZ`, so the scripts default it to `America/New_York` for journal dates and times.
+- The container runs on UTC, so the scripts set `TZ=America/New_York` themselves for journal dates and times.
 - `--add-dir` takes more than one value, so a prompt after it gets read as a directory. Keep the prompt first.
 - The sweep hands the tidy a list of notes over 8,000 words but never splits them on its own, it leaves an Open line instead.

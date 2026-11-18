@@ -11,7 +11,7 @@ VAULT=${VAULT:-$HOME/code/memory}
 STATE=$HOME/.claude/state/vault-scribe
 MAX_WORDS=${MAX_WORDS:-8000}
 here=$(dirname "$0")
-export TZ=${TZ:-America/New_York}
+export TZ=America/New_York
 
 find "$HOME/.claude/projects" -maxdepth 2 -name '*.jsonl' -mtime -2 | while read -r f; do
     "$here/vault-scribe.sh" "$f"

@@ -11,7 +11,7 @@ VAULT=${VAULT:-$HOME/code/memory}
 STATE=$HOME/.claude/state/vault-scribe
 MIN_LINES=${MIN_LINES:-4}
 here=$(dirname "$0")
-export TZ=${TZ:-America/New_York}
+export TZ=America/New_York
 
 transcript=$1
 [ -r "$transcript" ] || exit 0
