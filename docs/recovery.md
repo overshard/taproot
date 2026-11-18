@@ -80,8 +80,8 @@ make tunnel
 ```
 
 If llm's volume didn't come back, the gateway starts with no keys and turns
-chat, dash and pond away. Empty `LLM_KEY` in each of their `.env` files, then
-`make chat-key dash-key pond-key` and deploy all three.
+chat, dash and pond away. `make chat-key dash-key pond-key` hands it back the
+keys in their `.env` files, and nothing needs redeploying.
 
 ## 4. Finish up
 
