@@ -128,7 +128,7 @@ RUN mkdir -p /home/dev/code /home/dev/.claude /home/dev/.ssh /home/dev/.restic &
     ln -s code/memory/workspace.md /home/dev/CLAUDE.md && \
     printf '%s\n' \
     'Host *' \
-    '  IdentityFile ~/.ssh/home_key' \
+    '  IdentityFile ~/.ssh/github_key' \
     '  IdentitiesOnly yes' \
     '  StrictHostKeyChecking accept-new' \
     '  UpdateHostKeys yes' \
