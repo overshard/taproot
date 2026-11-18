@@ -22,7 +22,7 @@ It's reached over WireGuard only, `ssh debian@10.77.0.1`, with `MTU = 1220` on b
 
 ## Thin clients
 
-Desktop WSL and the phone are thin clients set up by `client/setup.sh`, with WireGuard, ssh and a read-only copy of the vault.
+Desktop WSL, laptop WSL and the phone are thin clients set up by `client/setup.sh`, with WireGuard, ssh and a read-only copy of the vault.
 
 ## Claude Code config
 
