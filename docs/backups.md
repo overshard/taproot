@@ -3,7 +3,7 @@
 The claude container on the VPS backs up to a Backblaze B2 bucket
 (`overshard-backups`) using restic. A systemd timer on the host runs it nightly
 and a second one reads back 5% of the repo every Sunday. Either one failing
-sends a high priority alert to the status topic on the phone. Retention is 7
+sends a high priority alert to the alerts topic on the phone. Retention is 7
 daily, 4 weekly and 6 monthly per host, pruned after each backup. Passwords and
 B2 keys live in Bitwarden.
 

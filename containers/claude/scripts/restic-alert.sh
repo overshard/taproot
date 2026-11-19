@@ -7,7 +7,7 @@
 #
 #   restic-alert restic-backup.service
 #
-# It borrows status' write token and topic, since the phone already listens
+# It borrows status' write token and the alerts topic, since the phone listens
 # there and ntfy has no other account that can publish. The post goes over the
 # orchard-edge bridge from orchard-util, because Caddy refuses publishes on the
 # public hostname.
@@ -33,4 +33,4 @@ sudo docker run --rm --network orchard-edge orchard-util \
     -H "Priority: high" \
     -H "Tags: floppy_disk" \
     -d "$unit failed. Look with: journalctl -u $unit" \
-    http://orchard-ntfy:8000/status
+    http://orchard-ntfy:8000/alerts
