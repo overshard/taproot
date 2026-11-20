@@ -1,9 +1,9 @@
 # claude
 #
 # The VPS's Claude Code container, run by compose.yml beside this file. Debian 13
-# with Go, Python (uv), Bun, the Docker CLI, gh, typst and Playwright, and no
-# nodejs, npm or Rust. Work lives in the volumes, so the container itself is
-# disposable.
+# with Go, Python (uv), Bun, the Docker CLI, gh, typst and Playwright with
+# Chromium and Firefox, and no nodejs, npm or Rust. Work lives in the volumes,
+# so the container itself is disposable.
 #
 # Gotchas: docker.sock is root-owned 660, so docker needs sudo in here. Bind
 # mounts under /home/dev silently mount empty, because the daemon resolves paths
@@ -94,7 +94,7 @@ RUN bun install -g @playwright/cli@${PLAYWRIGHT_CLI_VERSION} && \
     playwright-cli --help >/dev/null && \
     CORE="$(find /usr/local/install/global -path '*/playwright-core/cli.js' | head -1)" && \
     test -n "$CORE" && \
-    node "$CORE" install --with-deps chromium && \
+    node "$CORE" install --with-deps chromium firefox && \
     chmod -R a+rx /opt/playwright-browsers && \
     mkdir -p /opt/google/chrome && \
     ln -snf /opt/playwright-browsers/chromium-*/chrome-linux64/chrome /opt/google/chrome/chrome && \
