@@ -10,7 +10,7 @@ Playwright MCP server. The MCP streams the full accessibility tree and screensho
 into context on every step (~4x the tokens). The CLI writes that state to disk and lets
 you read only the snapshot lines you need. Same browser, far cheaper context.
 
-The claude container already ships Playwright Chromium at `/opt/playwright-browsers`
+The claude container already ships Playwright Chromium and Firefox at `/opt/playwright-browsers`
 (symlinked to `/opt/google/chrome/chrome`), so no extra browser download is needed.
 
 ## Setup
