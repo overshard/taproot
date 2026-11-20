@@ -8,7 +8,9 @@
 #
 # Every orchard-* volume is copied except the ones in SKIP. logging ages out
 # anyway and llm-models is model downloads, and both are big enough to matter
-# against B2's free 10GB.
+# against B2's free 10GB. dns' certificate and ACME key are reissued on their
+# own, and its query log is cut from the copy, since a lookup log with client
+# addresses shouldn't sit in B2 for six months.
 #
 # SQLite files go through sqlite3 .backup, since a plain copy of a live
 # database and its WAL can catch it half written. Each one is read as its
@@ -18,7 +20,7 @@
 
 set -eu
 
-SKIP="orchard-logging-data orchard-llm-models"
+SKIP="orchard-logging-data orchard-llm-models orchard-dns-tls orchard-dns-acme"
 OUT_VOLUME=claude-orchard-backup
 IMAGE=overshard/claude:latest
 
@@ -50,6 +52,9 @@ for v in "$@"; do
         mkdir -p "$(dirname "$dst")"
         setpriv --reuid="$(stat -c %u "$f")" --regid="$(stat -c %g "$f")" --clear-groups \
             sqlite3 "$f" ".backup '/tmp/dump.db'"
+        if [ "$v" = orchard-dns-data ]; then
+            sqlite3 /tmp/dump.db "DELETE FROM queries; VACUUM;"
+        fi
         mv /tmp/dump.db "$dst"
     done
 done
