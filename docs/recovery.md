@@ -38,8 +38,17 @@ config in `/etc`:
 - A LUKS file container mounted at `/srv` with `noauto`, so boot never waits
   on it, and unlocked by hand with `sudo systemctl start srv.mount`.
 - Docker CE with `data-root` on `/srv/docker` and containerd's root on
-  `/srv/containerd`, both started by the mount and not at boot.
-- zram swap, a journald cap and unattended-upgrades.
+  `/srv/containerd`, both started by the mount and not at boot. In
+  `/etc/docker/daemon.json`, `live-restore`, json-file logs at 3 by 10m, and
+  builder GC at `defaultMaxUsedSpace` 3GB and `defaultMinFreeSpace` 8GB.
+- zram swap, a journald cap and unattended-upgrades, with
+  `"origin=Docker,label=Docker CE";` added to `Origins-Pattern` so Docker
+  updates too.
+- `X11Forwarding no` and `AllowAgentForwarding no` in
+  `/etc/ssh/sshd_config.d/10-hardening.conf`, and
+  `/etc/sysctl.d/90-hardening.conf` with `kernel.kptr_restrict = 1`,
+  `kernel.yama.ptrace_scope = 1`, `net.core.bpf_jit_harden = 2`,
+  `vm.dirty_background_bytes = 33554432` and `vm.dirty_bytes = 134217728`.
 
 ## 2. The claude container and the restore
 
