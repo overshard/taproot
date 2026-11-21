@@ -46,7 +46,8 @@ set -eu
 for v in "$@"; do
     mkdir -p "/out/$v"
     rsync -a --delete --exclude='*.db' --exclude='*.sqlite3' \
-        --exclude='*-wal' --exclude='*-shm' --exclude='*-journal' "/in/$v/" "/out/$v/"
+        --exclude='*-wal' --exclude='*-shm' --exclude='*-journal' \
+        --exclude='acme-account.pem' --delete-excluded "/in/$v/" "/out/$v/"
     find "/in/$v" -type f \( -name '*.db' -o -name '*.sqlite3' \) | while read -r f; do
         dst="/out/$v/${f#/in/$v/}"
         mkdir -p "$(dirname "$dst")"
