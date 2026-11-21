@@ -52,10 +52,12 @@ for v in "$@"; do
         mkdir -p "$(dirname "$dst")"
         setpriv --reuid="$(stat -c %u "$f")" --regid="$(stat -c %g "$f")" --clear-groups \
             sqlite3 "$f" ".backup '/tmp/dump.db'"
-        if [ "$v" = orchard-dns-data ]; then
-            sqlite3 /tmp/dump.db "DELETE FROM queries; VACUUM;"
-        fi
         mv /tmp/dump.db "$dst"
+        # Not on /tmp/dump.db, since protected_regular stops root opening a
+        # file another uid owns in sticky /tmp and sqlite falls back to read only.
+        if [ "$v" = orchard-dns-data ]; then
+            sqlite3 "$dst" "DELETE FROM queries; VACUUM;"
+        fi
     done
 done
 for d in /out/*; do
