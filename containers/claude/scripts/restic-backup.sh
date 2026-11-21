@@ -85,7 +85,8 @@ timeout 3h restic backup \
     "$HOME/.ssh" $orchard || backup_exit=$?
 
 prune_exit=0
-timeout 1h restic forget --prune \
+# Repacking downloads packs from B2, so it waits until a tenth of the repo is unused.
+timeout 1h restic forget --prune --max-unused 10% \
     --host="$RESTIC_HOST" \
     --keep-daily   7 \
     --keep-weekly  4 \
