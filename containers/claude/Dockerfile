@@ -41,8 +41,20 @@ RUN apt-get update && \
         docker-ce-cli docker-compose-plugin docker-buildx-plugin && \
     rm -rf /var/lib/apt/lists/*
 
-RUN curl -fsSL https://astral.sh/uv/install.sh | env UV_INSTALL_DIR=/usr/local/bin sh && \
-    curl -fsSL https://bun.sh/install | bash
+ARG UV_VERSION=0.13.9
+ARG UV_SHA256=a7fbaff2b9a271d85c1bdb540941090fd1ce011797b4abeb48e4dcd39c2471d5
+RUN curl -fsSL -o /tmp/uv.tar.gz "https://github.com/astral-sh/uv/releases/download/${UV_VERSION}/uv-x86_64-unknown-linux-gnu.tar.gz" && \
+    echo "${UV_SHA256}  /tmp/uv.tar.gz" | sha256sum -c - && \
+    tar -C /usr/local/bin --strip-components=1 -xzf /tmp/uv.tar.gz && \
+    rm /tmp/uv.tar.gz
+
+ARG BUN_VERSION=1.4.5
+ARG BUN_SHA256=94559b3b528995a49452f9f2404cec74f2efd7d06e0a000a8cd214b02c3666eb
+RUN curl -fsSL -o /tmp/bun.zip "https://github.com/oven-sh/bun/releases/download/bun-v${BUN_VERSION}/bun-linux-x64.zip" && \
+    echo "${BUN_SHA256}  /tmp/bun.zip" | sha256sum -c - && \
+    unzip -j -d /usr/local/bin /tmp/bun.zip bun-linux-x64/bun && \
+    ln -sf /usr/local/bin/bun /usr/local/bin/bunx && \
+    rm /tmp/bun.zip
 
 # npm-published CLIs have a `#!/usr/bin/env node` shebang and die without this
 # shim. `node --version` does not work under it, hence the real script.
@@ -145,7 +157,9 @@ RUN mkdir -p /home/dev/code /home/dev/.claude /home/dev/.ssh /home/dev/.restic &
 WORKDIR /home/dev
 USER dev
 
-RUN curl -fsSL https://claude.ai/install.sh | bash
+# The installer checks the binary against its manifest, so pinning the version is enough.
+ARG CLAUDE_VERSION=2.1.330
+RUN curl -fsSL https://claude.ai/install.sh | bash -s "${CLAUDE_VERSION}"
 
 # Sessions are started from claude.ai or the app, so none is opened at boot.
 CMD ["claude", "remote-control", "--no-create-session-in-dir", "--permission-mode", "auto", "--capacity", "4"]
