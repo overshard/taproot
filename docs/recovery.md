@@ -71,7 +71,13 @@ of a half empty tree and that becomes the latest one.
 ## 3. The sites
 
 Inside the container, put each orchard volume back from `~/orchard-backup/`
-first, then:
+first, which creates any volume that isn't there yet:
+
+```sh
+for v in $(ls ~/orchard-backup); do orchard-restore "$v"; done
+```
+
+Then:
 
 ```sh
 cd ~/code/orchard && make install

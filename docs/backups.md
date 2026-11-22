@@ -17,8 +17,13 @@ last snapshot is still in there as host `desktop` with its Claude history.
 The snapshot also has `~/orchard-backup`, a copy of every orchard volume except
 logging and llm-models that `orchard-dump` takes right before. Databases in it
 come from `sqlite3 .backup`, so they're consistent even though the sites are
-running. To put one back, stop that site, restore the snapshot, and copy its
-directory from `orchard-backup/` into the volume.
+running. To put one back, restore the snapshot with `restic-restore` and then
+run `orchard-restore <volume>` inside the container, like `orchard-restore blog`.
+It stops whatever uses that volume, moves what's there into
+`.before-restore-<UTC>/`, copies the backup in, deletes any `-wal` or `-shm` so
+SQLite doesn't replay an old log over it, chowns it to 65532 since that's who
+the sites run as, runs `PRAGMA integrity_check` and starts the site again. If a
+check fails the site stays stopped.
 
 `restic-setup` is the way in. It reports what is set, verifies it by actually
 opening the repository, prompts for anything missing, and writes both files at
@@ -92,6 +97,7 @@ These are in `containers/claude/scripts/`, land in `~/scripts/` and are on
 | `restic-check`   | Read back 5% of the repo, run weekly by the host timer |
 | `restic-alert`   | Push a phone alert through ntfy, called when either timer fails |
 | `orchard-dump`   | Copy orchard's volumes into `~/orchard-backup` |
+| `orchard-restore` | Put one orchard volume back from `~/orchard-backup` |
 | `restic-restore` | Pull this host's latest snapshot from B2, existing data archived first |
 | `restic-status`  | Last snapshot per host, plus repo size, and `--age` for just this host's |
 | `code-sync`      | Pull every repo under `~/code/`, then clone any new ones from GitHub |
