@@ -18,12 +18,18 @@ unset ANTHROPIC_API_KEY ANTHROPIC_AUTH_TOKEN
 
 mkdir -p "$(dirname "$LOG")"
 cd "$VAULT" || exit 1
+# The transcript quotes text strangers wrote, so the shell is git in the vault
+# and nothing else, and dontAsk refuses anything not listed here.
 out=$(claude -p "$prompt" \
     --setting-sources "" \
     --model sonnet \
     --max-turns "${MAX_TURNS:-40}" \
     --tools Read,Edit,Write,Bash,Grep,Glob \
-    --permission-mode auto \
+    --permission-mode dontAsk \
+    --allowedTools Read Grep Glob "Edit(/$VAULT/**)" "Write(/$VAULT/**)" \
+        "Bash(git -C $VAULT add:*)" "Bash(git -C $VAULT commit:*)" \
+        "Bash(git -C $VAULT status:*)" "Bash(git -C $VAULT diff:*)" "Bash(git -C $VAULT log:*)" \
+        "Bash(git add:*)" "Bash(git commit:*)" "Bash(git status:*)" "Bash(git diff:*)" "Bash(git log:*)" \
     --no-session-persistence \
     --output-format json \
     --add-dir "$dir" 2>&1)
