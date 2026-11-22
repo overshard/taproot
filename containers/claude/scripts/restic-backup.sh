@@ -98,3 +98,20 @@ if [ "$worst" -ne 0 ]; then
     echo "dump exit ${dump_exit}, backup exit ${backup_exit}, prune exit ${prune_exit}" >&2
     exit "$worst"
 fi
+
+# One record to logging as source backup, whose watchdog pages when a day passes
+# without one, so a timer that stopped firing is caught too. Never fails the run.
+env_file="$HOME/code/orchard/sites/logging.bythewood.me/.env"
+token=$(sed -n 's/^LOGGING_TOKEN=//p' "$env_file" 2>/dev/null || true)
+if [ -n "$token" ]; then
+    body=$(printf '{"source":"backup","records":[{"t":%s,"l":"INFO","m":"backup finished","a":{"host":"%s"}}]}' \
+        "$(date +%s)000" "$RESTIC_HOST")
+    # The token goes in on stdin as curl config so it never shows in ps.
+    printf 'header = "X-Logging-Token: %s"\n' "$token" |
+        sudo docker run --rm -i --network orchard-edge orchard-util \
+        curl -fsS -o /dev/null -m 20 -K - -H 'Content-Type: application/json' \
+        -d "$body" http://orchard-logging:8000/ingest ||
+        echo "backup heartbeat to logging failed" >&2
+else
+    echo "no LOGGING_TOKEN in $env_file, so no heartbeat was sent" >&2
+fi
