@@ -5,7 +5,17 @@
     "CLAUDE_CODE_DISABLE_FEEDBACK_SURVEY": "1"
   },
   "permissions": {
-    "defaultMode": "auto"
+    "defaultMode": "auto",
+    "deny": [
+      "Bash(*docker run*--privileged*)",
+      "Bash(*docker run*-v /:*)",
+      "Bash(*docker run*--volume /:*)",
+      "Bash(*--pid=host*)",
+      "Bash(*--cap-add=ALL*)",
+      "Bash(*nsenter *)",
+      "Bash(curl *| sh*)",
+      "Bash(curl *| bash*)"
+    ]
   },
   "worktree": {
     "bgIsolation": "none"
@@ -73,6 +83,18 @@
           {
             "type": "command",
             "command": "$HOME/code/taproot/dotfiles/claude/hooks/vault-digest.sh",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "$HOME/code/taproot/dotfiles/claude/hooks/guard-bash.sh",
             "timeout": 10
           }
         ]

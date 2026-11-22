@@ -14,6 +14,7 @@ taproot is public, so only non-secret config goes here.
 | `skills/`                  | Our own skills (no MCPs, no plugins)                    |
 | `status-line.sh`           | The status line script (usg/ctx/cwd/git/ET clock)      |
 | `hooks/`                   | The vault hooks, run in place, see `docs/vault.md`     |
+| `hooks/guard-bash.sh`      | PreToolUse hook refusing docker flags that give the host |
 | `settings.json`            | Reference template of global settings (NOT symlinked)  |
 
 `settings.json` here is a **reference copy**, not a live symlink. The live
