@@ -34,7 +34,10 @@ config in `/etc`:
 
 - sshd with passwords and root login off, WireGuard on 51820/udp as 10.77.0.1,
   and ufw allowing only 51820/udp and everything on wg0. Re-add each client's
-  peer and key, `client/setup.sh` prints what it needs.
+  peer and key, `client/setup.sh` prints what it needs. A new VPS has a new
+  WireGuard key and address and `client/setup.sh` leaves an existing
+  `wg0.conf` alone, so on each client change `PublicKey` and `Endpoint` in
+  `/etc/wireguard/wg0.conf` and run `sudo systemctl restart wg-quick@wg0`.
 - A LUKS file container mounted at `/srv` with `noauto`, so boot never waits
   on it, and unlocked by hand with `sudo systemctl start srv.mount`.
 - Docker CE with `data-root` on `/srv/docker` and containerd's root on
