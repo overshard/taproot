@@ -45,7 +45,7 @@ sudo docker run --rm -i --pull=never -u 0 --network none $mounts -v "$OUT_VOLUME
 set -eu
 for v in "$@"; do
     mkdir -p "/out/$v"
-    rsync -a --delete --exclude='*.db' --exclude='*.sqlite3' \
+    rsync -a --delete --exclude='*.db' --exclude='*.sqlite3' --exclude='icon_cache/' \
         --exclude='*-wal' --exclude='*-shm' --exclude='*-journal' \
         --exclude='acme-account.pem' --delete-excluded "/in/$v/" "/out/$v/"
     find "/in/$v" -type f \( -name '*.db' -o -name '*.sqlite3' \) | while read -r f; do
