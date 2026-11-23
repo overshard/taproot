@@ -5,6 +5,7 @@
 # A PreToolUse hook for Bash. This container holds the host's Docker socket, so
 # one docker run with the wrong flags is root on the VPS. It refuses the shapes
 # that turn the socket into the host, and nsenter and curl piped into a shell.
+# It only reads the command typed, so the same flags in a script get past it.
 # Exit 2 blocks the call and hands the reason back to Claude.
 
 cmd=$(jq -r '.tool_input.command // empty' 2>/dev/null)
@@ -37,10 +38,18 @@ fi
 if printf '%s' "$flat" | grep -Eiq -- '--cap-add[= ]+(cap_)?all([^a-z]|$)'; then
     deny "--cap-add=ALL"
 fi
-if printf '%s' "$flat" | grep -Eq -- '(^| )(-v|--volume)(=| )?/((etc|root)(/[^ :]*)?)?:'; then
-    deny "bind mounting /, /etc or /root"
+if printf '%s' "$flat" | grep -Eiq -- '--cap-add[= ]+(cap_)?(sys_|dac_|net_admin|bpf|perfmon|mknod)'; then
+    deny "adding a capability that reaches the host"
 fi
-if printf '%s' "$flat" | grep -Eq -- '--mount[= ][^ ]*(source|src)=/((etc|root)(/[^, ]*)?)?(,| |$)'; then
-    deny "bind mounting /, /etc or /root"
+if printf '%s' "$flat" | grep -Eq -- '--device([= ]|-cgroup-rule)|--security-opt[= ]+[a-z-]*[=:]unconfined'; then
+    deny "a host device or an unconfined profile"
+fi
+# Only a named volume may be mounted from here. A path, a variable or the
+# socket as the source is refused, however it's spelled.
+if printf '%s' "$flat" | grep -Eq -- '(^| )(-v|--volume)(=| )?[^A-Za-z0-9 ][^ ]*:'; then
+    deny "mounting anything but a named volume"
+fi
+if printf '%s' "$flat" | grep -Eq -- '--mount[= ][^ ]*(type=bind|(source|src)=[^A-Za-z0-9])'; then
+    deny "mounting anything but a named volume"
 fi
 exit 0
