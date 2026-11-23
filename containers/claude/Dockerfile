@@ -131,7 +131,7 @@ COPY dotfiles/gitconfig /home/dev/.gitconfig
 COPY containers/claude/scripts/ /home/dev/scripts/
 
 # .claude.json lives in the volume so auth survives a rebuild.
-RUN mkdir -p /home/dev/code /home/dev/.claude /home/dev/.ssh /home/dev/.restic && \
+RUN mkdir -p /home/dev/code /home/dev/.claude /home/dev/.ssh /home/dev/.restic /home/dev/orchard-backup && \
     for f in /home/dev/scripts/*.sh; do mv "$f" "${f%.sh}"; done && \
     chmod +x /home/dev/scripts/* && \
     chmod 700 /home/dev/.restic && \
