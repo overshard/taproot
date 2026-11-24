@@ -17,6 +17,10 @@ services:
     # A cap so a runaway build, test or Chromium kills a job in here and not the
     # whole VPS, which runs every site as well.
     mem_limit: 2g
+    # The same as mem_limit, so it can't push the sites into swap either.
+    memswap_limit: 2g
+    # Half a core is always left for the sites during a build.
+    cpus: 1.5
     pids_limit: 2048
     restart: unless-stopped
     working_dir: /home/dev/code
