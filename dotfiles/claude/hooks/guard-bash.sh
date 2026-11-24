@@ -44,6 +44,9 @@ fi
 if printf '%s' "$flat" | grep -Eq -- '--device([= ]|-cgroup-rule)|--security-opt[= ]+[a-z-]*[=:]unconfined'; then
     deny "a host device or an unconfined profile"
 fi
+# The host's /etc may be mounted read only, to look at units and config.
+flat=$(printf '%s' "$flat" | sed -E 's#(^| )(-v|--volume)(=| )/etc:/[A-Za-z0-9/_-]+:ro( |$)#\1\4#g')
+
 # Only a named volume may be mounted from here. A path, a variable or the
 # socket as the source is refused, however it's spelled.
 if printf '%s' "$flat" | grep -Eq -- '(^| )(-v|--volume)(=| )?[^A-Za-z0-9 ][^ ]*:'; then
