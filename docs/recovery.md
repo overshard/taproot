@@ -52,6 +52,10 @@ config in `/etc`:
   `/etc/sysctl.d/90-hardening.conf` with `kernel.kptr_restrict = 1`,
   `kernel.yama.ptrace_scope = 1`, `net.core.bpf_jit_harden = 2`,
   `vm.dirty_background_bytes = 33554432` and `vm.dirty_bytes = 134217728`.
+- The `DOCKER-USER` block from [firewall.md](firewall.md) at the end of
+  `/etc/ufw/after.rules`, since a port Docker publishes skips ufw.
+- The `ntfy-alert@.service` and `reboot-required` units from
+  [alerts.md](alerts.md).
 
 ## 2. The claude container and the restore
 

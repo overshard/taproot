@@ -38,7 +38,7 @@ disk after a reboot and `claude-vps` for Claude Code inside the container.
 ```
 taproot/
 ├── client/              setup for a device that works through the VPS
-├── docs/                recovery, backups and the vault hooks
+├── docs/                recovery, backups, alerts, the firewall guard and the vault hooks
 ├── dotfiles/            bash, git, claude
 └── containers/claude/   compose file, Dockerfile, scripts copied to ~/scripts/
 ```
