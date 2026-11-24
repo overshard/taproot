@@ -7,15 +7,15 @@ Docker leaves one chain alone for this, `DOCKER-USER`, which every packet
 headed for a container passes first.
 
 This goes at the end of `/etc/ufw/after.rules`, after the `COMMIT` that's
-already there, with `PUBLIC_IF` swapped for the public interface that
-`ip route show default` names after `dev`:
+already there. `ens3` is the public interface on this VPS, and
+`ip route show default` names it after `dev` on another:
 
 ```
 *filter
 :DOCKER-USER - [0:0]
 -A DOCKER-USER -m conntrack --ctstate RELATED,ESTABLISHED -j RETURN
--A DOCKER-USER -i PUBLIC_IF -p tcp -m conntrack --ctorigdstport 853 -j RETURN
--A DOCKER-USER -i PUBLIC_IF -j DROP
+-A DOCKER-USER -i ens3 -p tcp -m conntrack --ctorigdstport 853 -j RETURN
+-A DOCKER-USER -i ens3 -j DROP
 COMMIT
 ```
 
