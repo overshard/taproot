@@ -161,5 +161,9 @@ USER dev
 ARG CLAUDE_VERSION=2.1.330
 RUN curl -fsSL https://claude.ai/install.sh | bash -s "${CLAUDE_VERSION}"
 
-# Sessions are started from claude.ai or the app, so none is opened at boot.
-CMD ["claude", "remote-control", "--no-create-session-in-dir", "--permission-mode", "auto", "--capacity", "4"]
+# One idle session is pre-created in ~/code at boot. That is what makes Claude Code
+# write ~/.claude/projects/-home-dev-code/bridge-pointer.json, so a restart or reboot
+# reuses the same environment in claude.ai/code instead of registering a new one and
+# orphaning open sessions. --no-create-session-in-dir skips the pointer and rotates
+# the environment every start: https://github.com/anthropics/claude-code/issues/96346
+CMD ["claude", "remote-control", "--permission-mode", "auto", "--capacity", "4"]
