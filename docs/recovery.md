@@ -39,7 +39,8 @@ config in `/etc`:
   `wg0.conf` alone, so on each client change `PublicKey` and `Endpoint` in
   `/etc/wireguard/wg0.conf` and run `sudo systemctl restart wg-quick@wg0`.
 - A LUKS file container mounted at `/srv` with `noauto`, so boot never waits
-  on it, and unlocked by hand with `sudo systemctl start srv.mount`.
+  on it, and unlocked by hand with `sudo systemctl start srv.mount`. The lines
+  that make it are under [The encrypted /srv](#the-encrypted-srv).
 - Docker CE with `data-root` on `/srv/docker` and containerd's root on
   `/srv/containerd`, both started by the mount and not at boot. In
   `/etc/docker/daemon.json`, `live-restore`, json-file logs at 3 by 10m, and
@@ -56,6 +57,58 @@ config in `/etc`:
   `/etc/ufw/after.rules`, since a port Docker publishes skips ufw.
 - The `ntfy-alert@.service` and `reboot-required` units from
   [alerts.md](alerts.md).
+
+### The encrypted /srv
+
+The container is one file, `/var/lib/srv.luks`, sized to most of the disk. Make
+it once with a passphrase that goes in Bitwarden and on the paper in the safe:
+
+```sh
+sudo fallocate -l 60G /var/lib/srv.luks
+sudo cryptsetup luksFormat /var/lib/srv.luks
+sudo cryptsetup open /var/lib/srv.luks srv
+sudo mkfs.ext4 /dev/mapper/srv
+sudo cryptsetup close srv
+```
+
+Then one line in `/etc/crypttab` and one in `/etc/fstab`. There is no
+`srv.mount` file, systemd writes that unit from the fstab line, and `noauto`
+on both keeps boot from stopping at a passphrase prompt nobody can answer.
+
+```
+# /etc/crypttab
+srv /var/lib/srv.luks none luks,noauto
+
+# /etc/fstab
+/dev/mapper/srv /srv ext4 noauto,nofail,x-systemd.requires=systemd-cryptsetup@srv.service 0 2
+```
+
+Docker and containerd each get a drop-in so they never start on an empty
+`/srv`, the same two lines in `/etc/systemd/system/docker.service.d/srv.conf`
+and `/etc/systemd/system/containerd.service.d/srv.conf`:
+
+```ini
+[Unit]
+Requisite=srv.mount
+After=srv.mount
+```
+
+And the mount pulls them up once it's there, with both disabled at boot:
+
+```sh
+sudo systemctl disable docker containerd
+sudo mkdir /etc/systemd/system/srv.mount.wants
+sudo ln -s /usr/lib/systemd/system/docker.service /etc/systemd/system/srv.mount.wants/
+sudo ln -s /usr/lib/systemd/system/containerd.service /etc/systemd/system/srv.mount.wants/
+sudo systemctl daemon-reload
+```
+
+After that `sudo systemctl start srv.mount` asks for the passphrase, mounts
+`/srv` and starts both, which is all `client/unlock-vps` does. Containerd's
+root is `root = "/srv/containerd"` in `/etc/containerd/config.toml`.
+
+**NOTE:** the 60G is a guess for a new box. `sudo ls -lh /var/lib/srv.luks` on
+the old one says what it was.
 
 ## 2. The claude container and the restore
 
