@@ -57,14 +57,22 @@ config in `/etc`:
   `/etc/ufw/after.rules`, since a port Docker publishes skips ufw.
 - The `ntfy-alert@.service` and `reboot-required` units from
   [alerts.md](alerts.md).
+- `/usr/local/bin/vault-upload-pack`, mode 755, which is what a client's
+  `vault-pull` asks for over ssh. It serves the vault out of the container and
+  there's no receive-pack beside it, so a client can't push:
+
+  ```sh
+  #!/bin/sh
+  exec sudo docker exec -i -u dev claude git-upload-pack /home/dev/code/memory
+  ```
 
 ### The encrypted /srv
 
-The container is one file, `/var/lib/srv.luks`, sized to most of the disk. Make
+The container is one file, `/var/lib/srv.luks`, 32G of the 40G disk. Make
 it once with a passphrase that goes in Bitwarden and on the paper in the safe:
 
 ```sh
-sudo fallocate -l 60G /var/lib/srv.luks
+sudo fallocate -l 32G /var/lib/srv.luks
 sudo cryptsetup luksFormat /var/lib/srv.luks
 sudo cryptsetup open /var/lib/srv.luks srv
 sudo mkfs.ext4 /dev/mapper/srv
@@ -107,8 +115,9 @@ After that `sudo systemctl start srv.mount` asks for the passphrase, mounts
 `/srv` and starts both, which is all `client/unlock-vps` does. Containerd's
 root is `root = "/srv/containerd"` in `/etc/containerd/config.toml`.
 
-**NOTE:** the 60G is a guess for a new box. `sudo ls -lh /var/lib/srv.luks` on
-the old one says what it was.
+**NOTE:** the file takes its 32G whether `/srv` is full or not, which leaves
+the root disk about 3.5G free for apt and kernels. `df -h /` near 100% means an
+`apt clean` or `journalctl --vacuum-size=200M`, not a bigger container.
 
 ## 2. The claude container and the restore
 
