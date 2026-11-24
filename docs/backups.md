@@ -101,4 +101,5 @@ These are in `containers/claude/scripts/`, land in `~/scripts/` and are on
 | `orchard-restore` | Put one orchard volume back from `~/orchard-backup` |
 | `restic-restore` | Pull this host's latest snapshot from B2, existing data archived first |
 | `restic-status`  | Last snapshot per host, plus repo size, and `--age` for just this host's |
+| `on-host`        | Run a command as root on the VPS host, which is how Claude maintains it |
 | `code-sync`      | Pull every repo under `~/code/`, then clone any new ones from GitHub |

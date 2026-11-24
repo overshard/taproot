@@ -5,7 +5,8 @@
 # A PreToolUse hook for Bash. This container holds the host's Docker socket, so
 # one docker run with the wrong flags is root on the VPS. It refuses the shapes
 # that turn the socket into the host, and nsenter and curl piped into a shell.
-# It only reads the command typed, so the same flags in a script get past it.
+# It only reads the command typed, so the same flags in a script get past it,
+# and ~/scripts/on-host is the one script meant to, for work on the host.
 # Exit 2 blocks the call and hands the reason back to Claude.
 
 cmd=$(jq -r '.tool_input.command // empty' 2>/dev/null)

@@ -20,6 +20,8 @@ Three systemd timers on the host `docker exec` into the container, and their uni
 
 It's reached over WireGuard only, `ssh debian@10.77.0.1`, with `MTU = 1220` on both ends since the path from home carries 1280 byte packets. ufw allows 51820/udp and everything on wg0 and nothing else. Docker's data lives on a LUKS `/srv` that has to be unlocked by hand after a reboot with `sudo systemctl start srv.mount`, which starts Docker and everything behind it. `docs/recovery.md` has the rest.
 
+Claude maintains the host from inside the container with `on-host`, which runs a command as root there, like `on-host systemctl status docker` or `on-host sh -s < script.sh`. The guard hook refuses the same flags typed any other way, and the Claude settings allow `Bash(on-host:*)`. Save what a file was before changing it and say how to undo it.
+
 ## Thin clients
 
 Desktop WSL, laptop WSL and the phone are thin clients set up by `client/setup.sh`, with WireGuard, ssh and a read-only copy of the vault.
