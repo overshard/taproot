@@ -51,6 +51,7 @@ Same as the restic ones, two plain units in `/etc/systemd/system/` on the host:
 Description=record the day's Claude sessions in the vault
 After=docker.service
 Requires=docker.service
+OnFailure=ntfy-alert@%n.service
 
 [Service]
 Type=oneshot
@@ -69,7 +70,7 @@ Persistent=true
 WantedBy=timers.target
 ```
 
-After writing them, `sudo systemctl daemon-reload && sudo systemctl enable --now vault-sweep.timer`, and `disable --now` undoes it. Run one by hand with `sudo systemctl start vault-sweep.service` and read it with `journalctl -u vault-sweep`.
+After writing them, `sudo systemctl daemon-reload && sudo systemctl enable --now vault-sweep.timer`, and `disable --now` undoes it. Run one by hand with `sudo systemctl start vault-sweep.service` and read it with `journalctl -u vault-sweep`. `OnFailure` pushes to the phone when a sweep fails, which is mostly an expired Claude login, and the unit it names is in [alerts.md](alerts.md).
 
 ## Things that will bite you
 
