@@ -52,7 +52,8 @@ A job is:
 - Send `at` for once or `cron` for repeating, never both. A time with no offset
   is Eastern, so send `2026-11-22T08:00` and not UTC. Cron lines are five fields
   on the Eastern clock, `@daily` and friends work, and `0 9 3 3 *` is 9am every
-  March 3rd.
+  March 3rd. A weekday can be `thu#4` for the 4th Thursday of the month or `mon#l`
+  for the last Monday, so Thanksgiving is `0 9 * 11 thu#4`.
 - `priority` is `min`, `low`, `default`, `high` or `urgent`. Use `high` only when
   he asked for it to be loud, and leave the rest at default.
 - A one-shot deletes itself once it lands. Pause a repeating one with
