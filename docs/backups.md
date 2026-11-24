@@ -96,6 +96,7 @@ These are in `containers/claude/scripts/`, land in `~/scripts/` and are on
 | `restic-backup`  | Run `orchard-dump`, then back up to B2 with the snapshot tagged `$RESTIC_HOST` |
 | `restic-check`   | Read back 5% of the repo, run weekly by the host timer |
 | `restic-alert`   | Push a phone alert through ntfy, called when either timer fails |
+| `ntfy-alert`     | Push any alert to the phone, which `restic-alert` and the host units in [alerts.md](alerts.md) use |
 | `orchard-dump`   | Copy orchard's volumes into `~/orchard-backup` |
 | `orchard-restore` | Put one orchard volume back from `~/orchard-backup` |
 | `restic-restore` | Pull this host's latest snapshot from B2, existing data archived first |
