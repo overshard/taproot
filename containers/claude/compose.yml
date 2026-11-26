@@ -17,8 +17,9 @@ services:
     # A cap so a runaway build, test or Chromium kills a job in here and not the
     # whole VPS, which runs every site as well.
     mem_limit: 2g
-    # The same as mem_limit, so it can't push the sites into swap either.
-    memswap_limit: 2g
+    # A gig of zram swap on top, since the Anthropic SDK in llm won't compile
+    # in 2g alone, and zram swap mostly costs CPU and not RAM.
+    memswap_limit: 3g
     # Half a core is always left for the sites during a build.
     cpus: 1.5
     pids_limit: 2048
@@ -30,7 +31,9 @@ services:
       - claude-ssh:/home/dev/.ssh
       - claude-restic:/home/dev/.restic
       - orchard-backup:/home/dev/orchard-backup
-      - /var/run/docker.sock:/var/run/docker.sock
+      # The host's /run and not the socket itself, since a mounted file keeps
+      # the old inode when dockerd restarts and docker goes dead in here.
+      - /run:/run/host
 
 volumes:
   claude-code:
