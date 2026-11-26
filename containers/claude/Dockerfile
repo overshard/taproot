@@ -125,6 +125,10 @@ RUN printf '%s\n' \
 RUN useradd -m -u 1001 -G sudo -s /bin/bash dev && \
     echo "dev ALL=(ALL) NOPASSWD: ALL" > /etc/sudoers.d/dev
 
+# compose.yml mounts the host's /run at /run/host, so the socket path survives
+# dockerd recreating it.
+RUN ln -s /run/host/docker.sock /run/docker.sock
+
 COPY dotfiles/bash_aliases /home/dev/.bash_aliases
 COPY dotfiles/gitconfig /home/dev/.gitconfig
 
